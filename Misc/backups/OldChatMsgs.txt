@@ -1,0 +1,32 @@
+// // ChatMessages.tsx (updated prop type for ref)
+
+// import React from 'react';
+// import { MessageDTO } from '../../types/MessageDTO';
+// import MessageItem from './MessageItem';
+
+// interface ChatMessagesProps {
+//   messages: MessageDTO[];
+//   currentUserId: string | null;
+//   messagesEndRef: React.RefObject<HTMLDivElement | null>;
+// }
+
+// const ChatMessages: React.FC<ChatMessagesProps> = ({ messages, currentUserId, messagesEndRef }) => {
+//   return (
+//     <div>
+//       {messages.map((message, index) => (
+//         <MessageItem
+//           key={message.id}
+//           message={message}
+//           index={index}
+//           messages={messages}
+//           currentUserId={currentUserId}
+//         />
+//       ))}
+//       <div ref={messagesEndRef} />
+//     </div>
+//   );
+// };
+
+// export default ChatMessages;
+
+// ChatMessages.tsx - With scroll-to-top loading (fixed scroll behavior)

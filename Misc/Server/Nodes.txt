@@ -1,0 +1,148 @@
+package org.acme.N4JDB.Nodes;
+
+import org.neo4j.ogm.annotation.Id;
+import org.neo4j.ogm.annotation.NodeEntity;
+import org.neo4j.ogm.annotation.Relationship;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@NodeEntity
+public class MessageNode {
+    @Id
+    private UUID id;
+    private String content;
+    private Instant createdAt;
+    private Boolean read = false;
+
+    @Relationship(type = "TO", direction = Relationship.Direction.OUTGOING)
+    private UserNode recipient;
+
+    @Relationship(type = "SENT", direction = Relationship.Direction.INCOMING)
+    private UserNode sender;
+
+    // Constructors
+    public MessageNode() {}
+
+    public MessageNode(UUID id, String content, Instant createdAt, Boolean read) {
+        this.id = id;
+        this.content = content;
+        this.createdAt = createdAt;
+        this.read = read;
+    }
+
+    // Getters and Setters
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public Boolean getRead() { return read; }
+    public void setRead(Boolean read) { this.read = read; }
+    public UserNode getRecipient() { return recipient; }
+    public void setRecipient(UserNode recipient) { this.recipient = recipient; }
+    public UserNode getSender() { return sender; }
+    public void setSender(UserNode sender) { this.sender = sender; }
+}
+
+package org.acme.N4JDB.Nodes;
+
+import org.neo4j.ogm.annotation.Id;
+import org.neo4j.ogm.annotation.NodeEntity;
+import org.neo4j.ogm.annotation.Relationship;
+
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+
+@NodeEntity
+public class UserNode {
+    @Id
+    private UUID userId; // Keycloak ID
+    private String displayName;
+
+    @Relationship(type = "FOLLOWS", direction = Relationship.Direction.OUTGOING)
+    private Set<UserNode> follows = new HashSet<>();
+
+    @Relationship(type = "FOLLOWED", direction = Relationship.Direction.INCOMING)
+    private Set<UserNode> followedBy = new HashSet<>();
+
+    @Relationship(type = "SENT", direction = Relationship.Direction.OUTGOING)
+    private Set<MessageNode> sentMessages = new HashSet<>();
+
+    @Relationship(type = "TRIGGERS", direction = Relationship.Direction.OUTGOING)
+    private Set<NotificationNode> triggeredNotifications = new HashSet<>();
+
+    // Constructors
+    public UserNode() {}
+
+    public UserNode(UUID userId, String username, Instant createdAt) {
+        this.userId = userId;
+        this.displayName = username;
+    }
+
+    // Getters and Setters
+    public UUID getUserId() { return userId; }
+    public void setUserId(UUID userId) { this.userId = userId; }
+    public String getDisplayName() { return displayName; }
+    public void setDisplayName(String displayName) { this.displayName = displayName; }
+    public Set<UserNode> getFollows() { return follows; }
+    public void setFollows(Set<UserNode> follows) { this.follows = follows; }
+    public Set<UserNode> getFollowedBy() { return followedBy; }
+    public void setFollowedBy(Set<UserNode> followedBy) { this.followedBy = followedBy; }
+    public Set<MessageNode> getSentMessages() { return sentMessages; }
+    public void setSentMessages(Set<MessageNode> sentMessages) { this.sentMessages = sentMessages; }
+    public Set<NotificationNode> getTriggeredNotifications() { return triggeredNotifications; }
+    public void setTriggeredNotifications(Set<NotificationNode> triggeredNotifications) { this.triggeredNotifications = triggeredNotifications; }
+}
+
+
+package org.acme.N4JDB.Nodes;
+
+import org.neo4j.ogm.annotation.Id;
+import org.neo4j.ogm.annotation.NodeEntity;
+import org.neo4j.ogm.annotation.Relationship;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@NodeEntity
+public class NotificationNode {
+    @Id
+    private UUID id;
+    private String content;
+    private Instant createdAt;
+    private Boolean read = false;
+
+    @Relationship(type = "FOR", direction = Relationship.Direction.OUTGOING)
+    private UserNode target;
+
+    @Relationship(type = "TRIGGERS", direction = Relationship.Direction.INCOMING)
+    private UserNode triggerer;
+
+    // Constructors
+    public NotificationNode() {}
+
+    public NotificationNode(UUID id, String content, Instant createdAt, Boolean read) {
+        this.id = id;
+        this.content = content;
+        this.createdAt = createdAt;
+        this.read = read;
+    }
+
+    // Getters and Setters
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public Boolean getRead() { return read; }
+    public void setRead(Boolean read) { this.read = read; }
+    public UserNode getTarget() { return target; }
+    public void setTarget(UserNode target) { this.target = target; }
+    public UserNode getTriggerer() { return triggerer; }
+    public void setTriggerer(UserNode triggerer) { this.triggerer = triggerer; }
+}

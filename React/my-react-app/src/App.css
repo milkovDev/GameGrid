@@ -1,0 +1,62 @@
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.App-background {
+  background-image: url('/public/images/bg-light.jpg'); /* Path to your image */
+  background-position: center;
+  background-repeat: repeat;
+  min-height: 100vh; /* Ensures it covers the viewport height */
+}
+
+.game-card-tags {
+  display: inline-block;
+  background-color: #f8f9fa; /* Light gray background, matches Keycloak theme */
+  color: #212529; /* Dark text for contrast */
+  padding: 0.15rem 0.15rem; /* Padding for bubble effect */
+  border-radius: 0.25rem; /* Rounded edges */
+  font-size: 0.875rem; /* Matches Bootstrap’s <small> */
+  margin-right: 0.5rem; /* Space between bubbles */
+  margin-bottom: 0.5rem; /* Space for wrapping on smaller screens */
+}
+
+.game-card-tags-container {
+  display: flex;
+  flex-wrap: wrap; /* Allows bubbles to wrap to next line on small screens */
+  gap: 0.1rem; /* Alternative to margin for consistent spacing */
+}

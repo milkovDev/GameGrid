@@ -1,0 +1,190 @@
+package org.acme.N4JDB.Repositories;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityNotFoundException;
+import org.acme.N4JDB.Nodes.MessageNode;
+import org.neo4j.ogm.session.Session;
+import org.neo4j.ogm.session.SessionFactory;
+import java.util.Collection;
+import java.util.UUID;
+
+@ApplicationScoped
+public class MessageNodeRepository {
+    @Inject
+    SessionFactory sessionFactory;
+
+    public Collection<MessageNode> findMessagesFromTo(UUID senderId, UUID recipientId) {
+        Session session = sessionFactory.openSession();
+        String cypher = "MATCH (sender:UserNode {userId: $senderId})-[:SENT]->(msg:MessageNode)-[:TO]->(recipient:UserNode {userId: $recipientId}) " +
+                "RETURN msg";
+        Map<String, Object> params = Map.of("senderId", senderId, "recipientId", recipientId);
+        Iterable<MessageNode> results = session.query(MessageNode.class, cypher, params);
+        Collection<MessageNode> messages = new ArrayList<>();
+        results.forEach(messages::add);
+        session.clear();
+        return messages;
+    }
+
+    public MessageNode findById(UUID id) {
+        Session session = sessionFactory.openSession();
+        MessageNode result = session.load(MessageNode.class, id);
+        session.clear();
+        return result;
+    }
+
+    public void save(MessageNode message) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            session.save(message);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        }
+        session.clear();
+    }
+
+    public void delete(UUID id) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            MessageNode message = session.load(MessageNode.class, id);
+            if (message == null) {
+                throw new EntityNotFoundException("MessageNode with ID " + id + " not found");
+            }
+            session.delete(message);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        }
+        session.clear();
+    }
+}
+
+package org.acme.N4JDB.Repositories;
+
+import jakarta.persistence.EntityNotFoundException;
+import org.acme.N4JDB.Nodes.UserNode;
+import org.neo4j.ogm.session.Session;
+import org.neo4j.ogm.session.SessionFactory;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import java.util.Collection;
+
+@ApplicationScoped
+public class UserNodeRepository {
+    @Inject
+    SessionFactory sessionFactory;
+
+    public Collection<UserNode> findAll() {
+        Session session = sessionFactory.openSession();
+        Collection<UserNode> result = session.loadAll(UserNode.class);
+        session.clear();
+        return result;
+    }
+
+    public UserNode findById(String userId) {
+        Session session = sessionFactory.openSession();
+        UserNode result = session.load(UserNode.class, userId);
+        session.clear();
+        return result;
+    }
+
+    public void save(UserNode user) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            session.save(user);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        }
+        session.clear();
+    }
+
+    public void delete(String userId) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            UserNode user = session.load(UserNode.class, userId);
+            if (user == null) {
+                throw new EntityNotFoundException("UserNode with ID " + userId + " not found");
+            }
+            session.delete(user);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        }
+        session.clear();
+    }
+}
+
+package org.acme.N4JDB.Repositories;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityNotFoundException;
+import org.acme.N4JDB.Nodes.NotificationNode;
+import org.neo4j.ogm.session.Session;
+import org.neo4j.ogm.session.SessionFactory;
+import java.util.Collection;
+import java.util.UUID;
+
+@ApplicationScoped
+public class NotificationNodeRepository {
+    @Inject
+    SessionFactory sessionFactory;
+
+    public Collection<NotificationNode> findByTargetId(UUID targetId) {
+        Session session = sessionFactory.openSession();
+        String cypher = "MATCH (target:UserNode {userId: $targetId})<-[:FOR]-(notif:NotificationNode) RETURN notif";
+        Map<String, Object> params = Map.of("targetId", targetId);
+        Iterable<NotificationNode> results = session.query(NotificationNode.class, cypher, params);
+        Collection<NotificationNode> notifications = new ArrayList<>();
+        results.forEach(notifications::add);
+        session.clear();
+        return notifications;
+    }
+
+    public NotificationNode findById(UUID id) {
+        Session session = sessionFactory.openSession();
+        NotificationNode result = session.load(NotificationNode.class, id);
+        session.clear();
+        return result;
+    }
+
+    public void save(NotificationNode notification) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            session.save(notification);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        }
+        session.clear();
+    }
+
+    public void delete(UUID id) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            NotificationNode notification = session.load(NotificationNode.class, id);
+            if (notification == null) {
+                throw new EntityNotFoundException("NotificationNode with ID " + id + " not found");
+            }
+            session.delete(notification);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        }
+        session.clear();
+    }
+}

@@ -1,0 +1,341 @@
+package org.acme.N4JDB.Repositories;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityNotFoundException;
+import org.acme.N4JDB.Nodes.MessageNode;
+import org.acme.N4JDB.Nodes.UserNode;
+import org.neo4j.ogm.session.Session;
+import org.neo4j.ogm.session.SessionFactory;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Map;
+import java.util.UUID;
+
+@ApplicationScoped
+public class MessageNodeRepository {
+    @Inject
+    SessionFactory sessionFactory;
+
+    @Inject
+    UserNodeRepository userNodeRepository;
+
+    public Collection<MessageNode> findUnreadForUser(String userId) {
+        Session session = sessionFactory.openSession();
+        String cypher = """
+    MATCH (sender)-[:SENT]->(m:MessageNode)-[:TO]->(u:UserNode {userId: $userId})
+    WHERE m.read = false
+    RETURN m ORDER BY m.createdAt ASC
+    """;
+        Map<String, Object> params = Map.of("userId", userId);
+
+        Iterable<MessageNode> results = session.query(MessageNode.class, cypher, params);
+        Collection<MessageNode> messages = new ArrayList<>();
+
+        // Load each message with its relationships
+        for (MessageNode msg : results) {
+            MessageNode fullMessage = session.load(MessageNode.class, msg.getId(), 1);
+            messages.add(fullMessage);
+        }
+
+        session.clear();
+        return messages;
+    }
+
+    public Collection<MessageNode> findMessagesBetweenPaginated(
+            String user1Id,
+            String user2Id,
+            int limit,
+            int skip
+    ) {
+        Session session = sessionFactory.openSession();
+        String cypher = """
+    MATCH (u1:UserNode {userId: $user1Id}), (u2:UserNode {userId: $user2Id})
+    MATCH (sender)-[:SENT]->(msg:MessageNode)-[:TO]->(recipient)
+    WHERE (sender = u1 AND recipient = u2) OR (sender = u2 AND recipient = u1)
+    RETURN msg ORDER BY msg.createdAt DESC
+    SKIP $skip
+    LIMIT $limit
+    """;
+        Map<String, Object> params = Map.of(
+                "user1Id", user1Id,
+                "user2Id", user2Id,
+                "skip", skip,
+                "limit", limit
+        );
+
+        Iterable<MessageNode> results = session.query(MessageNode.class, cypher, params);
+        Collection<MessageNode> messages = new ArrayList<>();
+
+        // Load each message with its relationships
+        for (MessageNode msg : results) {
+            MessageNode fullMessage = session.load(MessageNode.class, msg.getId(), 1);
+            messages.add(fullMessage);
+        }
+
+        session.clear();
+        return messages;
+    }
+
+    public MessageNode findById(Long id) {
+        Session session = sessionFactory.openSession();
+        // Load with depth 1 to include relationships
+        MessageNode result = session.load(MessageNode.class, id, 1);
+
+        session.clear();
+        return result;
+    }
+
+    public void save(MessageNode message) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            // Update recipient's receivedMessages
+            if (message.getRecipient() != null) {
+                UserNode recipient = message.getRecipient();
+                if (!recipient.getReceivedMessages().contains(message)) {
+                    recipient.getReceivedMessages().add(message);
+                    userNodeRepository.save(recipient);
+                }
+            }
+            session.save(message);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        }
+        session.clear();
+    }
+
+    public void markAsReadUpTo(String senderId, String recipientId, Instant upToTime) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            String cypher = """
+            MATCH (s:UserNode {userId: $senderId})-[:SENT]->(m:MessageNode)-[:TO]->(r:UserNode {userId: $recipientId})
+            WHERE m.createdAt <= $upToTime AND m.read = false
+            SET m.read = true
+            """;
+            Map<String, Object> params = Map.of(
+                    "senderId", senderId,
+                    "recipientId", recipientId,
+                    "upToTime", upToTime.toString()  // Convert Instant to String for Neo4j OGM compatibility
+            );
+            session.query(cypher, params);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        }
+        session.clear();
+    }
+
+    public void delete(Long id) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            MessageNode message = session.load(MessageNode.class, id);
+            if (message == null) {
+                throw new EntityNotFoundException("MessageNode with ID " + id + " not found");
+            }
+            // Remove message from recipient's receivedMessages
+            if (message.getRecipient() != null) {
+                UserNode recipient = message.getRecipient();
+                recipient.getReceivedMessages().remove(message);
+                userNodeRepository.save(recipient);
+            }
+            session.delete(message);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        }
+        session.clear();
+    }
+}
+
+package org.acme.N4JDB.Repositories;
+
+import jakarta.persistence.EntityNotFoundException;
+import org.acme.N4JDB.Nodes.UserNode;
+import org.neo4j.ogm.cypher.ComparisonOperator;
+import org.neo4j.ogm.session.Session;
+import org.neo4j.ogm.session.SessionFactory;
+import org.neo4j.ogm.cypher.Filter;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+import java.util.*;
+
+@ApplicationScoped
+public class UserNodeRepository {
+    @Inject
+    SessionFactory sessionFactory;
+
+    public UserNode findByGraphId(Long id) {
+        Session session = sessionFactory.openSession();
+
+        UserNode userNode = session.load(UserNode.class, id);
+        session.clear();
+
+        return userNode;
+    }
+
+    public UserNode findById(String userId) {
+        Session session = sessionFactory.openSession();
+
+        // Use Filter to search by the userId field (not the primary key)
+        Filter filter = new Filter("userId", ComparisonOperator.EQUALS, userId);
+        Collection<UserNode> users = session.loadAll(UserNode.class, filter);
+        session.clear();
+
+        return users.isEmpty() ? null : users.iterator().next();
+    }
+
+    public void save(UserNode user) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            session.save(user);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        } finally {
+            session.clear();
+        }
+    }
+
+    public Set<UserNode> getFollowers(String userId) {
+        Session session = sessionFactory.openSession();
+        String cypher = "MATCH (u:UserNode {userId: $userId})<-[:FOLLOWS]-(follower:UserNode) RETURN follower";
+        Map<String, Object> params = Map.of("userId", userId);
+        Iterable<UserNode> results = session.query(UserNode.class, cypher, params);
+        Set<UserNode> followers = new HashSet<>();
+        results.forEach(followers::add);
+        session.clear();
+        return followers;
+    }
+
+    public boolean deleteFollowsRelationship(String followerId, String followedId) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            String cypher = "MATCH (follower:UserNode {userId: $followerId})-[r:FOLLOWS]->(followed:UserNode {userId: $followedId}) " +
+                    "DELETE r " +
+                    "RETURN count(r) AS deletedCount";
+            Map<String, Object> params = Map.of("followerId", followerId, "followedId", followedId);
+            Long deletedCount = session.queryForObject(Long.class, cypher, params);
+            tx.commit();
+            return deletedCount > 0;
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        } finally {
+            session.clear();
+        }
+    }
+}
+
+package org.acme.N4JDB.Repositories;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.EntityNotFoundException;
+import org.acme.N4JDB.Nodes.NotificationNode;
+import org.acme.N4JDB.Nodes.UserNode;
+import org.neo4j.ogm.session.Session;
+import org.neo4j.ogm.session.SessionFactory;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Map;
+import java.util.UUID;
+
+@ApplicationScoped
+public class NotificationNodeRepository {
+    @Inject
+    SessionFactory sessionFactory;
+
+    @Inject
+    UserNodeRepository userNodeRepository;
+
+    public Collection<NotificationNode> findByTargetId(String targetId) {
+        Session session = sessionFactory.openSession();
+        String cypher = "MATCH (target:UserNode {userId: $targetId})<-[:FOR]-(notif:NotificationNode) RETURN notif";
+        Map<String, Object> params = Map.of("targetId", targetId);
+        Iterable<NotificationNode> results = session.query(NotificationNode.class, cypher, params);
+        Collection<NotificationNode> notifications = new ArrayList<>();
+        results.forEach(notifications::add);
+
+        session.clear();
+        return notifications;
+    }
+
+    public Collection<NotificationNode> findUnreadForUser(String userId) {
+        Session session = sessionFactory.openSession();
+        String cypher = "MATCH (u:UserNode {userId: $userId})<-[:FOR]-(n:NotificationNode {read: false}) " +
+                "RETURN n ORDER BY n.createdAt ASC";
+        Map<String, Object> params = Map.of("userId", userId);
+        Iterable<NotificationNode> results = session.query(NotificationNode.class, cypher, params);
+        Collection<NotificationNode> notifications = new ArrayList<>();
+        results.forEach(notifications::add);
+
+        session.clear();
+        return notifications;
+    }
+
+    public NotificationNode findById(Long id) {
+        Session session = sessionFactory.openSession();
+        NotificationNode result = session.load(NotificationNode.class, id);
+
+        session.clear();
+        return result;
+    }
+
+    public void save(NotificationNode notification) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            // Update target's receivedNotifications
+            if (notification.getTarget() != null) {
+                UserNode target = notification.getTarget();
+                if (!target.getReceivedNotifications().contains(notification)) {
+                    target.getReceivedNotifications().add(notification);
+                    userNodeRepository.save(target);
+                }
+            }
+            session.save(notification);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        }
+        session.clear();
+    }
+
+    public void delete(Long id) {
+        Session session = sessionFactory.openSession();
+        var tx = session.beginTransaction();
+        try {
+            NotificationNode notification = session.load(NotificationNode.class, id);
+            if (notification == null) {
+                throw new EntityNotFoundException("NotificationNode with ID " + id + " not found");
+            }
+            // Remove notification from target's receivedNotifications
+            if (notification.getTarget() != null) {
+                UserNode target = notification.getTarget();
+                target.getReceivedNotifications().remove(notification);
+                userNodeRepository.save(target);
+            }
+            session.delete(notification);
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+            throw e;
+        }
+        session.clear();
+    }
+}

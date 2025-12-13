@@ -1,0 +1,551 @@
+package org.acme.PGDB.DTOs;
+
+public class ArticleBlockDTO {
+    private Long id;
+    private Long articleId;
+    private String blockType;
+    private String content;
+    private int position;
+
+    public ArticleBlockDTO() {}
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getArticleId() {
+        return articleId;
+    }
+
+    public void setArticleId(Long articleId) {
+        this.articleId = articleId;
+    }
+
+    public String getBlockType() {
+        return blockType;
+    }
+
+    public void setBlockType(String blockType) {
+        this.blockType = blockType;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public int getPosition() {
+        return position;
+    }
+
+    public void setPosition(int position) {
+        this.position = position;
+    }
+}
+
+package org.acme.PGDB.DTOs;
+
+import org.acme.N4JDB.DTOs.UserNodeDTO;
+
+public class CombinedUserDTO {
+    public UserDTO relationalData;
+    public UserNodeDTO graphData;
+
+    public CombinedUserDTO() {}
+
+    public CombinedUserDTO(UserDTO relationalData, UserNodeDTO graphData) {
+        this.relationalData = relationalData;
+        this.graphData = graphData;
+    }
+
+    public UserDTO getRelationalData() {
+        return relationalData;
+    }
+
+    public void setRelationalData(UserDTO relationalData) {
+        this.relationalData = relationalData;
+    }
+
+    public UserNodeDTO getGraphData() {
+        return graphData;
+    }
+
+    public void setGraphData(UserNodeDTO graphData) {
+        this.graphData = graphData;
+    }
+}
+
+package org.acme.PGDB.DTOs;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+public class ArticleDTO {
+    private Long id;
+    private String title;
+    private String author;
+    private UUID authorId;
+    private LocalDateTime publishedAt;
+    private String featuredImageUrl;
+    private List<ArticleBlockDTO> articleBlocks;
+
+    public ArticleDTO() {}
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(String author) {
+        this.author = author;
+    }
+
+    public LocalDateTime getPublishedAt() {
+        return publishedAt;
+    }
+
+    public void setPublishedAt(LocalDateTime publishedAt) {
+        this.publishedAt = publishedAt;
+    }
+
+    public String getFeaturedImageUrl() {
+        return featuredImageUrl;
+    }
+
+    public void setFeaturedImageUrl(String featuredImageUrl) {
+        this.featuredImageUrl = featuredImageUrl;
+    }
+
+    public List<ArticleBlockDTO> getArticleBlocks() {
+        return articleBlocks;
+    }
+
+    public void setArticleBlocks(List<ArticleBlockDTO> articleBlocks) {
+        this.articleBlocks = articleBlocks;
+    }
+
+    public UUID getAuthorId() {
+        return authorId;
+    }
+
+    public void setAuthorId(UUID authorId) {
+        this.authorId = authorId;
+    }
+}
+
+package org.acme.PGDB.DTOs;
+
+import java.util.List;
+
+public class DeveloperDTO {
+    private Long id;
+    private String name;
+
+    public DeveloperDTO() {}
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+package org.acme.PGDB.DTOs;
+
+import java.time.LocalDate;
+import java.util.List;
+
+public class GameDTO {
+    private Long id;
+    private String title;
+    private String description;
+    private LocalDate releaseDate;
+    private String coverUrl;
+    private DeveloperDTO developer;
+    private PublisherDTO publisher;
+    private List<GameGenreDTO> gameGenres;
+    private List<GamePlatformDTO> gamePlatforms;
+
+    public GameDTO() {}
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public LocalDate getReleaseDate() {
+        return releaseDate;
+    }
+
+    public void setReleaseDate(LocalDate releaseDate) {
+        this.releaseDate = releaseDate;
+    }
+
+    public DeveloperDTO getDeveloper() {
+        return developer;
+    }
+
+    public void setDeveloper(DeveloperDTO developer) {
+        this.developer = developer;
+    }
+
+    public PublisherDTO getPublisher() {
+        return publisher;
+    }
+
+    public void setPublisher(PublisherDTO publisher) {
+        this.publisher = publisher;
+    }
+
+    public String getCoverUrl() {
+        return coverUrl;
+    }
+
+    public void setCoverUrl(String coverUrl) {
+        this.coverUrl = coverUrl;
+    }
+
+    public List<GameGenreDTO> getGameGenres() {
+        return gameGenres;
+    }
+
+    public void setGameGenres(List<GameGenreDTO> gameGenres) {
+        this.gameGenres = gameGenres;
+    }
+
+    public List<GamePlatformDTO> getGamePlatforms() {
+        return gamePlatforms;
+    }
+
+    public void setGamePlatforms(List<GamePlatformDTO> gamePlatforms) {
+        this.gamePlatforms = gamePlatforms;
+    }
+}
+
+package org.acme.PGDB.DTOs;
+
+public class GameGenreDTO {
+    private Long id;
+    private Long gameId;
+    private GenreDTO genre;
+
+    public GameGenreDTO() {}
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getGameId() {
+        return gameId;
+    }
+
+    public void setGameId(Long gameId) {
+        this.gameId = gameId;
+    }
+
+    public GenreDTO getGenre() {
+        return genre;
+    }
+
+    public void setGenre(GenreDTO genre) {
+        this.genre = genre;
+    }
+}
+
+package org.acme.PGDB.DTOs;
+
+public class GamePlatformDTO {
+    private Long id;
+    private Long gameId;
+    private PlatformDTO platform;
+
+    public GamePlatformDTO() {}
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Long getGameId() {
+        return gameId;
+    }
+
+    public void setGameId(Long gameId) {
+        this.gameId = gameId;
+    }
+
+    public PlatformDTO getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(PlatformDTO platform) {
+        this.platform = platform;
+    }
+}
+
+package org.acme.PGDB.DTOs;
+
+import java.util.List;
+
+public class GenreDTO {
+    private Long id;
+    private String name;
+
+    public GenreDTO() {}
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+package org.acme.PGDB.DTOs;
+
+import java.util.List;
+
+public class PlatformDTO {
+    private Long id;
+    private String name;
+
+    public PlatformDTO() {}
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+package org.acme.PGDB.DTOs;
+
+import java.util.List;
+
+public class PublisherDTO {
+    private Long id;
+    private String name;
+
+    public PublisherDTO() {}
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+package org.acme.PGDB.DTOs;
+
+import java.util.List;
+import java.util.UUID;
+
+public class UserDTO {
+    private UUID id;
+    private String displayName;
+    private String bio;
+    private String avatarUrl;
+    private List<UserGameListEntryDTO> userGameListEntries;
+
+    public UserDTO() {}
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public String getBio() {
+        return bio;
+    }
+
+    public void setBio(String bio) {
+        this.bio = bio;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
+    }
+
+    public List<UserGameListEntryDTO> getUserGameListEntries() {
+        return userGameListEntries;
+    }
+
+    public void setUserGameListEntries(List<UserGameListEntryDTO> userGameListEntries) {
+        this.userGameListEntries = userGameListEntries;
+    }
+}
+
+package org.acme.PGDB.DTOs;
+
+import java.util.UUID;
+
+public class UserGameListEntryDTO {
+    private Long id;
+    private UUID userId;
+    private GameDTO game;
+    private String status;
+    private boolean isFavorite;
+    private Integer rating;
+    private String reviewText;
+
+    public UserGameListEntryDTO() {}
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public UUID getUserId() {
+        return userId;
+    }
+
+    public void setUserId(UUID userId) {
+        this.userId = userId;
+    }
+
+    public GameDTO getGame() {
+        return game;
+    }
+
+    public void setGame(GameDTO game) {
+        this.game = game;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public boolean getIsFavorite() {
+        return isFavorite;
+    }
+
+    public void setIsFavorite(boolean isFavorite) {
+        this.isFavorite = isFavorite;
+    }
+
+    public Integer getRating() {
+        return rating;
+    }
+
+    public void setRating(Integer rating) {
+        this.rating = rating;
+    }
+
+    public String getReviewText() {
+        return reviewText;
+    }
+
+    public void setReviewText(String reviewText) {
+        this.reviewText = reviewText;
+    }
+}

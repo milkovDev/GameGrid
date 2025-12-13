@@ -1,0 +1,294 @@
+export class imageApi {
+    //local
+    //private static readonly BASE_URL = 'http://localhost:8080';
+    //online
+    private static readonly BASE_URL = 'https://quarkus.gamegrid.buzz';
+    private static readonly DEFAULT_COVER_URL = '/api/images/default-cover.jpg';
+
+    static getGameImage(coverUrl?: string | null): string {
+        return (coverUrl && coverUrl !== 'default-cover.jpg') 
+            ? `${this.BASE_URL}${coverUrl}` 
+            : `${this.BASE_URL}${this.DEFAULT_COVER_URL}`;
+    }
+
+    static getArticleImage(coverUrl?: string | null): string {
+        return (coverUrl && coverUrl !== 'default-cover.jpg') 
+            ? `${this.BASE_URL}${coverUrl}` 
+            : `${this.BASE_URL}${this.DEFAULT_COVER_URL}`;
+    }
+
+    static getAvatarImage(coverUrl?: string | null): string {
+        return (coverUrl && coverUrl !== 'default-cover.jpg') 
+            ? `${this.BASE_URL}${coverUrl}` 
+            : `${this.BASE_URL}${this.DEFAULT_COVER_URL}`;
+    }
+}
+import axios from 'axios';
+
+const api = axios.create({
+    //local
+    //baseURL: 'http://localhost:8080/api',
+    //online
+    baseURL: 'https://quarkus.gamegrid.buzz/api',
+});
+
+// Interceptor to add token (call setAuthInterceptor in AuthProvider after login)
+export const setAuthInterceptor = (getToken: () => string | null) => {
+    api.interceptors.request.use((config) => {
+        const token = getToken();
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    });
+};
+
+export default api;
+// import { ArticleDTO } from '../types/ArticleDTO';
+// import api from './apiClient';
+
+// export const getAllArticles = async (token: string): Promise<ArticleDTO[]> => {
+//     const response = await api.get('/articles/getAll', {
+//         headers: { Authorization: `Bearer ${token}` }
+//     });
+//     return response.data;
+// };
+
+// export const createArticle = async (token: string, article: Partial<ArticleDTO>): Promise<ArticleDTO> => {
+//   const response = await api.post('/articles/create', article, {
+//     headers: { Authorization: `Bearer ${token}` }
+//   });
+//   return response.data;
+// };
+
+// export const updateArticle = async (token: string, article: ArticleDTO): Promise<ArticleDTO> => {
+//   const response = await api.put('/articles/update', article, {
+//     headers: { Authorization: `Bearer ${token}` }
+//   });
+//   return response.data;
+// };
+
+// src/api/articleApi.ts
+import { ArticleDTO } from '../types/ArticleDTO';
+import api from './apiClient';
+
+export const getAllArticles = async (token: string): Promise<ArticleDTO[]> => {
+    const response = await api.get('/articles/getAll', {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const createArticle = async (token: string, formData: FormData): Promise<ArticleDTO> => {
+  const response = await api.post('/articles/create', formData, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const updateArticle = async (token: string, formData: FormData): Promise<ArticleDTO> => {
+  const response = await api.put('/articles/update', formData, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+import { DeveloperDTO } from '../types/DeveloperDTO';
+import api from './apiClient';
+
+export const getAllDevelopers = async (token: string): Promise<DeveloperDTO[]> => {
+  const response = await api.get('/developers/getAll', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const createDeveloper = async (token: string, name: string): Promise<DeveloperDTO> => {
+  const response = await api.post('/developers/create', { name }, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+
+import api from './apiClient';
+import { MessageDTO } from '../types/MessageDTO';
+
+export const getMessagesBetween = async (
+    token: string, 
+    user1Id: string, 
+    user2Id: string,
+    limit: number = 100,
+    skip: number = 0
+): Promise<MessageDTO[]> => {
+    const response = await api.get(`/messages/between/${user1Id}/${user2Id}`, {
+        params: { limit, skip },
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const markAsReadUpTo = async (token: string, lastId: number): Promise<void> => {
+    await api.put(`/messages/read-up-to/${lastId}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+};
+
+export const editMessage = async (token: string, messageId: number, content: string): Promise<MessageDTO> => {
+    const response = await api.put(`/messages/edit/${messageId}`, 
+        { content }, 
+        {
+            headers: { Authorization: `Bearer ${token}` }
+        }
+    );
+    return response.data;
+};
+
+export const deleteMessage = async (token: string, messageId: number): Promise<void> => {
+    await api.delete(`/messages/delete/${messageId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+};
+import { GameDTO } from '../types/GameDTO';
+import api from './apiClient';
+
+export const getAllGames = async (token: string): Promise<GameDTO[]> => {
+    const response = await api.get('/games/getAll', {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const createGame = async (token: string, formData: FormData): Promise<GameDTO> => {
+  const response = await api.post('/games/create', formData, {
+    headers: { Authorization: `Bearer ${token}` }  // Do NOT set Content-Type; let browser handle for FormData
+  });
+  return response.data;
+};
+
+export const updateGame = async (token: string, formData: FormData): Promise<GameDTO> => {
+  const response = await api.put('/games/update', formData, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+import api from './apiClient';
+import { NotificationDTO } from '../types/NotificationDTO';
+
+export const getNotifications = async (targetId: string): Promise<NotificationDTO[]> => {
+    const response = await api.get<NotificationDTO[]>(`/notifications/getForUser/${targetId}`);
+    return response.data;
+};
+    
+export const markAsRead = async (id: number): Promise<void> => {
+    await api.put(`/notifications/read/${id}`);
+};
+
+export const deleteNotification = async (id: number): Promise<void> => {
+    await api.delete(`/notifications/delete/${id}`);
+};
+import { PublisherDTO } from '../types/PublisherDTO';
+import api from './apiClient';
+
+export const getAllPublishers = async (token: string): Promise<PublisherDTO[]> => {
+  const response = await api.get('/publishers/getAll', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const createPublisher = async (token: string, name: string): Promise<PublisherDTO> => {
+  const response = await api.post('/publishers/create', { name }, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+// ugleApi.ts
+import api from './apiClient';
+import { UserGameListEntryDTO } from '../types/UserGameListEntryDTO';
+
+export const createUGLE = async (token: string, dto: UserGameListEntryDTO): Promise<UserGameListEntryDTO> => {
+  const response = await api.post(`/usergamelistentries/create`, dto, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const updateUGLE = async (token: string, dto: UserGameListEntryDTO): Promise<UserGameListEntryDTO> => {
+  const response = await api.put(`/usergamelistentries/update`, dto, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const deleteUGLE = async (token: string, dto: UserGameListEntryDTO): Promise<void> => {
+  await api.delete(`/usergamelistentries/delete`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: dto
+  });
+};
+import { CombinedUserDTO } from '../types/CombinedUserDTO';
+import { UserDTO } from '../types/UserDTO';
+import api from './apiClient';
+
+export const getUser = async (token: string): Promise<CombinedUserDTO> => {
+    const response = await api.get(`/users/me`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    // Convert following and followers to Set objects
+    const data = response.data as CombinedUserDTO;
+    return {
+        ...data,
+        graphData: {
+            ...data.graphData,
+            following: new Set(data.graphData.following),
+            followers: new Set(data.graphData.followers)
+        }
+    };
+};
+
+export const updateUser = async (token: string, formData: FormData): Promise<UserDTO> => {
+  const response = await api.put('/users/update', formData, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const getAllUsers = async (token: string): Promise<UserDTO[]> => {
+    const response = await api.get(`/users/getAll`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const getById = async (token: string, userId: string): Promise<UserDTO> => {
+    const response = await api.get(`/users/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const followUser = async (token: string, followedId: string): Promise<void> => {
+    await api.post(`/users/follow/${followedId}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+};
+
+export const unfollowUser = async (token: string, followedId: string): Promise<void> => {
+    await api.delete(`/users/unfollow/${followedId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+};
+
+export const getUserFollowing = async (token: string, userId: string): Promise<UserDTO[]> => {
+  const response = await api.get(`/users/following/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const getUserFollowers = async (token: string, userId: string): Promise<UserDTO[]> => {
+  const response = await api.get(`/users/followers/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};

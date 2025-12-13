@@ -1,0 +1,1087 @@
+package org.acme.Services;
+
+import io.quarkus.hibernate.orm.panache.Panache;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.NotFoundException;
+import org.acme.PGDB.DTOs.ArticleBlockDTO;
+import org.acme.PGDB.DTOs.ArticleDTO;
+import org.acme.PGDB.Entities.Article;
+import org.acme.PGDB.Entities.ArticleBlock;
+import org.acme.PGDB.Entities.BlockTypeEnum;
+import org.acme.PGDB.Entities.User;
+import org.acme.PGDB.Mappers.ArticleBlockMapper;
+import org.acme.PGDB.Mappers.ArticleMapper;
+import org.acme.PGDB.Repositories.ArticleBlockRepository;
+import org.acme.PGDB.Repositories.ArticleRepository;
+import org.acme.PGDB.Repositories.UserRepository;
+import org.acme.WebSocket.NotificationManager;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class ArticleService {
+
+    @Inject
+    ArticleMapper articleMapper;
+
+    @Inject
+    ArticleRepository articleRepository;
+
+    @Inject
+    ArticleBlockMapper articleBlockMapper;
+
+    @Inject
+    ArticleBlockRepository articleBlockRepository;
+
+    @Inject
+    NotificationManager notificationManager;
+
+    @Transactional
+    public ArticleDTO create(ArticleDTO dto) {
+        Article article = articleMapper.toEntity(dto);
+        articleRepository.persist(article);
+
+        article.setArticleBlocks(new ArrayList<>());
+
+        List<ArticleBlockDTO> blockDtos = dto.getArticleBlocks() != null ? dto.getArticleBlocks() : new ArrayList<>();
+        for (ArticleBlockDTO blockDto : blockDtos) {
+            blockDto.setArticleId(article.getId());
+            ArticleBlock block = articleBlockMapper.toEntity(blockDto);
+            articleBlockRepository.persist(block);
+
+
+            article.getArticleBlocks().add(block);
+        }
+
+        //push notifications to followers
+        notificationManager.notifyArticlePublished(article.getAuthor().getId().toString(), article.getAuthor().getDisplayName(), article.getTitle());
+
+        return articleMapper.toDTO(article);
+    }
+
+    @Transactional
+    public ArticleDTO update(ArticleDTO dto) {
+        if (dto.getId() == null) {
+            throw new IllegalArgumentException("ID is required for update");
+        }
+
+        Article article = articleRepository.findById(dto.getId());
+        if (article == null) {
+            throw new NotFoundException("Article not found");
+        }
+
+        article.setTitle(dto.getTitle());
+        article.setFeaturedImageUrl(dto.getFeaturedImageUrl());
+
+        List<ArticleBlock> existingBlocks = article.getArticleBlocks();
+        List<ArticleBlockDTO> newBlockDtos = dto.getArticleBlocks() != null ? dto.getArticleBlocks() : new ArrayList<>();
+
+        Set<Long> newBlockIds = newBlockDtos.stream()
+                .map(ArticleBlockDTO::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // Delete removed blocks
+        List<ArticleBlock> toDelete = existingBlocks.stream()
+                .filter(b -> !newBlockIds.contains(b.getId()))
+                .toList();
+        for (ArticleBlock block : toDelete) {
+            article.getArticleBlocks().remove(block);
+            articleBlockRepository.delete(block);
+        }
+
+        // Create or update blocks
+        for (ArticleBlockDTO blockDto : newBlockDtos) {
+            if (blockDto.getId() == null) {
+                // Create new
+                blockDto.setArticleId(article.getId());
+                ArticleBlock newBlock = articleBlockMapper.toEntity(blockDto);
+                articleBlockRepository.persist(newBlock);
+            } else {
+                // Update existing
+                ArticleBlock block = articleBlockRepository.findById(blockDto.getId());
+                if (block != null && block.getArticle().getId().equals(article.getId())) {
+                    block.setBlockType(BlockTypeEnum.valueOf(blockDto.getBlockType()));
+                    block.setContent(blockDto.getContent());
+                    block.setPosition(blockDto.getPosition());
+
+                    articleBlockRepository.persist(block);
+                }
+            }
+        }
+
+        Panache.getEntityManager().flush(); // Ensure changes are flushed
+
+        return articleMapper.toDTO(article);
+    }
+
+    public List<ArticleDTO> getAll() {
+        return articleRepository.listAll().stream()
+                .map(articleMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+}
+
+package org.acme.Services;
+
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import org.acme.PGDB.DTOs.GenreDTO;
+import org.acme.PGDB.Entities.Genre;
+import org.acme.PGDB.Mappers.GenreMapper;
+import org.acme.PGDB.Repositories.GenreRepository;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class GenreService {
+
+    @Inject
+    GenreMapper genreMapper;
+
+    @Inject
+    GenreRepository genreRepository;
+
+    @Transactional
+    public GenreDTO create(GenreDTO dto) {
+        Genre entity = genreMapper.toEntity(dto);
+        genreRepository.persist(entity);
+        return genreMapper.toDTO(entity);
+    }
+
+    public List<GenreDTO> getAll() {
+        return genreRepository.listAll().stream()
+                .map(genreMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+}
+
+package org.acme.Services;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import org.acme.PGDB.DTOs.PlatformDTO;
+import org.acme.PGDB.Entities.Genre;
+import org.acme.PGDB.Entities.Platform;
+import org.acme.PGDB.Mappers.PlatformMapper;
+import org.acme.PGDB.Repositories.PlatformRepository;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class PlatformService {
+
+    @Inject
+    PlatformMapper platformMapper;
+
+    @Inject
+    PlatformRepository platformRepository;
+
+    @Transactional
+    public PlatformDTO create(PlatformDTO dto) {
+        Platform entity = platformMapper.toEntity(dto);
+        platformRepository.persist(entity);
+        return platformMapper.toDTO(entity);
+    }
+
+    public List<PlatformDTO> getAll() {
+        return platformRepository.listAll().stream()
+                .map(platformMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+}
+
+package org.acme.Services;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import org.acme.PGDB.DTOs.DeveloperDTO;
+import org.acme.PGDB.Entities.Developer;
+import org.acme.PGDB.Mappers.DeveloperMapper;
+import org.acme.PGDB.Repositories.DeveloperRepository;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class DeveloperService {
+
+    @Inject
+    DeveloperMapper developerMapper;
+
+    @Inject
+    DeveloperRepository developerRepository;
+
+    @Transactional
+    public DeveloperDTO create(DeveloperDTO dto) {
+        Developer entity = developerMapper.toEntity(dto);
+        developerRepository.persist(entity);
+        return developerMapper.toDTO(entity);
+    }
+
+    public List<DeveloperDTO> getAll() {
+        return developerRepository.listAll().stream()
+                .map(developerMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+}
+
+package org.acme.Services;
+
+import io.quarkus.hibernate.orm.panache.Panache;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import org.acme.PGDB.DTOs.GameDTO;
+import org.acme.PGDB.DTOs.GameGenreDTO;
+import org.acme.PGDB.DTOs.GamePlatformDTO;
+import org.acme.PGDB.Entities.*;
+import org.acme.PGDB.Mappers.*;
+import org.acme.PGDB.Repositories.GameRepository;
+import org.acme.PGDB.Repositories.GamesGenresRepository;
+import org.acme.PGDB.Repositories.GamesPlatformsRepository;
+
+import java.util.*;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class GameService {
+
+    @Inject
+    GameMapper gameMapper;
+
+    @Inject
+    GameRepository gameRepository;
+
+    @Inject
+    GamesGenresRepository gamesGenresRepository;
+
+    @Inject
+    GamesPlatformsRepository gamesPlatformsRepository;
+
+    @Inject
+    GamePlatformMapper gamePlatformMapper;
+
+    @Inject
+    GameGenreMapper gameGenreMapper;
+
+    @Transactional
+    public GameDTO create(GameDTO dto) {
+        Game game = gameMapper.toEntity(dto);
+
+        gameRepository.persist(game);
+
+        game.setGamesGenres(new ArrayList<>());
+        game.setGamesPlatforms(new ArrayList<>());
+
+        List<GameGenreDTO> gameGenreDTOS = dto.getGameGenres() != null ? dto.getGameGenres() : new ArrayList<>();
+        for (GameGenreDTO gameGenreDTO : gameGenreDTOS) {
+            gameGenreDTO.setGameId(game.getId());
+            GamesGenres gg = gameGenreMapper.toEntity(gameGenreDTO);
+            gamesGenresRepository.persist(gg);
+
+            game.getGamesGenres().add(gg);
+        }
+
+        List<GamePlatformDTO> gamePlatformDTOS = dto.getGamePlatforms() != null ? dto.getGamePlatforms() : new ArrayList<>();
+        for (GamePlatformDTO gamePlatformDTO : gamePlatformDTOS) {
+            gamePlatformDTO.setGameId(game.getId());
+            GamesPlatforms gp = gamePlatformMapper.toEntity(gamePlatformDTO);
+            gamesPlatformsRepository.persist(gp);
+
+            game.getGamesPlatforms().add(gp);
+        }
+
+        return gameMapper.toDTO(game);
+    }
+
+    @Transactional
+    public GameDTO update(GameDTO dto) {
+        Game game = gameRepository.findById(dto.getId());
+
+        game.setTitle(dto.getTitle());
+        game.setDescription(dto.getDescription());
+        game.setReleaseDate(dto.getReleaseDate());
+        game.setCoverUrl(dto.getCoverUrl());
+
+        // Handle genres
+        List<GamesGenres> existingGameGenres = game.getGamesGenres();
+        List<GameGenreDTO> newGameGenres = dto.getGameGenres() != null ? dto.getGameGenres() : new ArrayList<>();
+
+        Set<Long> newGameGenreIds = newGameGenres.stream()
+                .map(GameGenreDTO::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // Delete removed genre associations
+        List<GamesGenres> gameGenresToDelete = existingGameGenres.stream()
+                .filter(gg -> !newGameGenreIds.contains(gg.getId()))
+                .toList();
+
+        for (GamesGenres gg : gameGenresToDelete) {
+            game.getGamesGenres().remove(gg);
+            gg.getGenre().getGamesGenres().remove(gg);
+            gamesGenresRepository.delete(gg);
+        }
+
+        for (GameGenreDTO gameGenreDTO : newGameGenres) {
+            if (gameGenreDTO.getId() == null) {
+                gameGenreDTO.setGameId(game.getId());
+                GamesGenres gg = gameGenreMapper.toEntity(gameGenreDTO);
+                gamesGenresRepository.persist(gg);
+
+                game.getGamesGenres().add(gg);
+            }
+        }
+
+        List<GamesPlatforms> existingGamePlatforms = game.getGamesPlatforms();
+        List<GamePlatformDTO> newGamePlatforms = dto.getGamePlatforms() != null ? dto.getGamePlatforms() : new ArrayList<>();
+
+        Set<Long> newGamePlatformIds = newGamePlatforms.stream()
+                .map(GamePlatformDTO::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        // Delete removed platform associations
+        List<GamesPlatforms> gamePlatformsToDelete = existingGamePlatforms.stream()
+                .filter(gp -> !newGamePlatformIds.contains(gp.getId()))
+                .toList();
+        for (GamesPlatforms gp : gamePlatformsToDelete) {
+            game.getGamesPlatforms().remove(gp);
+            gp.getPlatform().getGamesPlatforms().remove(gp);
+            gamesPlatformsRepository.delete(gp);
+        }
+
+        for (GamePlatformDTO gamePlatformDTO : newGamePlatforms) {
+            if (gamePlatformDTO.getId() == null) {
+                gamePlatformDTO.setGameId(game.getId());
+                GamesPlatforms gp = gamePlatformMapper.toEntity(gamePlatformDTO);
+                gamesPlatformsRepository.persist(gp);
+
+                game.getGamesPlatforms().add(gp);
+            }
+        }
+
+        Panache.getEntityManager().flush(); // Ensure changes are flushed
+
+        return gameMapper.toDTO(game);
+    }
+
+    public List<GameDTO> getAll() {
+        return gameRepository.listAll().stream()
+                .map(gameMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<GameDTO> findByFilters(Long genreId, Long platformId, Long developerId, Long publisherId) {
+        StringBuilder queryBuilder = new StringBuilder("FROM Game g WHERE 1=1");
+        Map<String, Object> parameters = new HashMap<>();
+
+        if (developerId != null) {
+            queryBuilder.append(" AND g.developer.id = :developerId");
+            parameters.put("developerId", developerId);
+        }
+        if (publisherId != null) {
+            queryBuilder.append(" AND g.publisher.id = :publisherId");
+            parameters.put("publisherId", publisherId);
+        }
+        if (genreId != null) {
+            queryBuilder.append(" AND EXISTS (SELECT 1 FROM GamesGenres gg WHERE gg.game = g AND gg.genre.id = :genreId)");
+            parameters.put("genreId", genreId);
+        }
+        if (platformId != null) {
+            queryBuilder.append(" AND EXISTS (SELECT 1 FROM GamesPlatforms gp WHERE gp.game = g AND gp.platform.id = :platformId)");
+            parameters.put("platformId", platformId);
+        }
+
+        List<Game> games = gameRepository.find(queryBuilder.toString(), parameters).list();
+        return games.stream()
+                .map(gameMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+}
+
+package org.acme.Services;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.ForbiddenException;
+import jakarta.ws.rs.NotFoundException;
+import org.acme.N4JDB.DTOs.MessageNodeDTO;
+import org.acme.N4JDB.Mappers.MessageNodeMapper;
+import org.acme.N4JDB.Nodes.MessageNode;
+import org.acme.N4JDB.Repositories.MessageNodeRepository;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class MessageNodeService {
+
+    @Inject
+    MessageNodeMapper messageNodeMapper;
+
+    @Inject
+    MessageNodeRepository messageNodeRepository;
+
+    public MessageNodeDTO create(MessageNodeDTO dto) {
+        MessageNode entity = messageNodeMapper.toEntity(dto);
+        if (entity.getSender() == null || entity.getRecipient() == null) {
+            throw new IllegalArgumentException("Sender and recipient IDs are required");
+        }
+        messageNodeRepository.save(entity);
+        return messageNodeMapper.toDTO(entity);
+    }
+
+    public MessageNodeDTO update(MessageNodeDTO dto) {
+        if (dto.getId() == null) {
+            throw new IllegalArgumentException("ID is required for update");
+        }
+        MessageNode entity = messageNodeRepository.findById(dto.getId());
+        if (entity == null) {
+            throw new NotFoundException("Message not found");
+        }
+        // Update editable fields
+        if (dto.getContent() != null) {
+            entity.setContent(dto.getContent());
+        }
+
+        messageNodeRepository.save(entity);
+        return messageNodeMapper.toDTO(entity);
+    }
+
+    public void markAsRead(Long id) {
+        MessageNode entity = messageNodeRepository.findById(id);
+        if (entity == null) {
+            throw new NotFoundException("Message not found");
+        }
+        entity.setRead(true);
+        messageNodeRepository.save(entity);
+    }
+
+    public void delete(Long id) {
+        messageNodeRepository.delete(id);
+    }
+
+    public List<MessageNodeDTO> getUnreadForUser(String userId) {
+        return messageNodeRepository.findUnreadForUser(userId).stream()
+                .map(messageNodeMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public void markAsReadUpTo(Long lastMessageId, String recipientId) {
+        MessageNode lastMessage = messageNodeRepository.findById(lastMessageId);
+        if (lastMessage == null) {
+            throw new NotFoundException("Message not found");
+        }
+
+        // Check if the current user is part of this conversation
+        boolean isRecipient = lastMessage.getRecipient().getUserId().equals(recipientId);
+        boolean isSender = lastMessage.getSender().getUserId().equals(recipientId);
+
+        if (!isRecipient && !isSender) {
+            throw new ForbiddenException("You can only mark messages from your own conversations as read");
+        }
+
+        // Determine who the other person in the conversation is
+        String otherUserId = isRecipient
+                ? lastMessage.getSender().getUserId()
+                : lastMessage.getRecipient().getUserId();
+
+        Instant upToTime = lastMessage.getCreatedAt();
+
+        // Mark all messages from the other user to the current user as read
+        messageNodeRepository.markAsReadUpTo(otherUserId, recipientId, upToTime);
+    }
+
+    public List<MessageNodeDTO> getMessagesBetweenPaginated(
+            String user1Id,
+            String user2Id,
+            int limit,
+            int skip
+    ) {
+        // Get messages in DESC order (newest first) from DB
+        List<MessageNodeDTO> messages = messageNodeRepository
+                .findMessagesBetweenPaginated(user1Id, user2Id, limit, skip)
+                .stream()
+                .map(messageNodeMapper::toDTO)
+                .collect(Collectors.toList());
+
+        // Reverse to return in ASC order (oldest first) to frontend
+        java.util.Collections.reverse(messages);
+        return messages;
+    }
+}
+
+package org.acme.Services;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
+
+import javax.imageio.ImageIO;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.UUID;
+
+@ApplicationScoped
+public class ImageService {
+
+    private static final String BASE_UPLOAD_DIR = "Uploads/";
+    private static final String GAMES_UPLOAD_DIR = BASE_UPLOAD_DIR + "games/";
+    private static final String ARTICLES_UPLOAD_DIR = BASE_UPLOAD_DIR + "articles/";
+    private static final String AVATARS_UPLOAD_DIR = BASE_UPLOAD_DIR + "avatars/";
+    private static final String[] ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"};
+    private static final String DEFAULT_COVER_URL = "default-cover.jpg";
+
+    // Target dimensions for different image types
+    private static final int GAME_WIDTH = 1920;
+    private static final int GAME_HEIGHT = 1080; // 16:9 ratio
+    private static final int ARTICLE_WIDTH = 1920;
+    private static final int ARTICLE_HEIGHT = 1080; // 16:9 ratio
+    private static final int AVATAR_SIZE = 512; // 1:1 ratio (square)
+
+    public ImageService() {
+        createDirectoryIfNotExists(BASE_UPLOAD_DIR, "Base Uploads");
+        createDirectoryIfNotExists(GAMES_UPLOAD_DIR, "Games");
+        createDirectoryIfNotExists(ARTICLES_UPLOAD_DIR, "Articles");
+        createDirectoryIfNotExists(AVATARS_UPLOAD_DIR, "Avatars");
+    }
+
+    private void createDirectoryIfNotExists(String dirPath, String dirName) {
+        File dir = new File(dirPath);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+    }
+
+    public String uploadImage(FileUpload file, String existingUrl, String imageType) throws IOException {
+        if (file == null || file.fileName() == null || file.fileName().isEmpty()) {
+            return null;
+        }
+
+        String filename = file.fileName().toLowerCase();
+        if (!isValidImageFile(filename)) {
+            throw new IllegalArgumentException("Invalid image file type. Allowed: jpg, jpeg, png, gif, webp.");
+        }
+
+        String uploadDir = getUploadDirectory(imageType);
+        String urlPrefix = getUrlPrefix(imageType);
+
+        // Generate unique filename (always save as .jpg for consistency)
+        String uniqueFilename = UUID.randomUUID() + ".jpg";
+        Path targetPath = Paths.get(uploadDir, uniqueFilename);
+
+        try {
+            // Read and process the image
+            BufferedImage originalImage = readImage(file.uploadedFile());
+            BufferedImage processedImage = processImageByType(originalImage, imageType);
+
+            // Save the processed image as JPEG
+            ImageIO.write(processedImage, "jpg", targetPath.toFile());
+
+        } catch (IOException e) {
+            throw new IOException("Image processing failed: " + e.getMessage(), e);
+        }
+
+        // Delete old file if it exists
+        deleteOldImage(existingUrl, uploadDir);
+
+        String newUrl = urlPrefix + uniqueFilename;
+        return newUrl;
+    }
+
+    private BufferedImage readImage(Path filePath) throws IOException {
+        BufferedImage image;
+
+        // Try direct file reading first
+        try {
+            image = ImageIO.read(filePath.toFile());
+        } catch (Exception e) {
+            // Fallback to InputStream reading
+            try (var inputStream = Files.newInputStream(filePath)) {
+                image = ImageIO.read(inputStream);
+            }
+        }
+
+        if (image == null) {
+            throw new IOException("Unable to read image file - may be corrupted or unsupported format");
+        }
+
+        return image;
+    }
+
+    private BufferedImage processImageByType(BufferedImage originalImage, String imageType) {
+        return switch (imageType.toLowerCase()) {
+            case "games" -> resizeImage(originalImage, GAME_WIDTH, GAME_HEIGHT);
+            case "articles" -> resizeImage(originalImage, ARTICLE_WIDTH, ARTICLE_HEIGHT);
+            case "avatars" -> resizeImage(originalImage, AVATAR_SIZE, AVATAR_SIZE);
+            default -> throw new IllegalArgumentException("Invalid image type: " + imageType);
+        };
+    }
+
+    private BufferedImage resizeImage(BufferedImage originalImage, int targetWidth, int targetHeight) {
+        BufferedImage resizedImage = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g2d = resizedImage.createGraphics();
+
+        // Enable high-quality rendering
+        g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        g2d.drawImage(originalImage, 0, 0, targetWidth, targetHeight, null);
+        g2d.dispose();
+
+        return resizedImage;
+    }
+
+    private boolean isValidImageFile(String filename) {
+        for (String ext : ALLOWED_EXTENSIONS) {
+            if (filename.endsWith(ext)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String getUploadDirectory(String imageType) {
+        return switch (imageType.toLowerCase()) {
+            case "games" -> GAMES_UPLOAD_DIR;
+            case "articles" -> ARTICLES_UPLOAD_DIR;
+            case "avatars" -> AVATARS_UPLOAD_DIR;
+            default -> throw new IllegalArgumentException("Invalid image type: " + imageType);
+        };
+    }
+
+    private String getUrlPrefix(String imageType) {
+        return switch (imageType.toLowerCase()) {
+            case "games" -> "/api/images/games/";
+            case "articles" -> "/api/images/articles/";
+            case "avatars" -> "/api/images/avatars/";
+            default -> throw new IllegalArgumentException("Invalid image type: " + imageType);
+        };
+    }
+
+    private void deleteOldImage(String existingUrl, String uploadDir) {
+        if (existingUrl == null || existingUrl.trim().isEmpty() || existingUrl.equals(DEFAULT_COVER_URL)) {
+            return;
+        }
+
+        try {
+            String oldFilename;
+            if (existingUrl.contains("/")) {
+                oldFilename = existingUrl.substring(existingUrl.lastIndexOf('/') + 1);
+            } else {
+                oldFilename = existingUrl;
+            }
+
+            if (!oldFilename.trim().isEmpty()) {
+                Path oldFilePath = Paths.get(uploadDir, oldFilename);
+                Files.deleteIfExists(oldFilePath);
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the upload
+            System.err.println("Failed to delete old image: " + e.getMessage());
+        }
+    }
+
+    public String getDefaultCoverUrl() {
+        return DEFAULT_COVER_URL;
+    }
+}
+package org.acme.Services;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import org.acme.PGDB.DTOs.PublisherDTO;
+import org.acme.PGDB.Entities.Publisher;
+import org.acme.PGDB.Mappers.PublisherMapper;
+import org.acme.PGDB.Repositories.PublisherRepository;
+
+import java.util.List;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class PublisherService {
+
+    @Inject
+    PublisherMapper publisherMapper;
+
+    @Inject
+    PublisherRepository publisherRepository;
+
+    @Transactional
+    public PublisherDTO create(PublisherDTO dto) {
+        Publisher entity = publisherMapper.toEntity(dto);
+        publisherRepository.persist(entity);
+        return publisherMapper.toDTO(entity);
+    }
+
+    public List<PublisherDTO> getAll() {
+        return publisherRepository.listAll().stream()
+                .map(publisherMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+}
+
+package org.acme.Services;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.json.bind.Jsonb;
+import jakarta.json.bind.JsonbBuilder;
+import jakarta.websocket.Session;
+import jakarta.ws.rs.NotFoundException;
+import org.acme.N4JDB.DTOs.NotificationNodeDTO;
+import org.acme.N4JDB.Mappers.NotificationNodeMapper;
+import org.acme.N4JDB.Nodes.NotificationNode;
+import org.acme.N4JDB.Repositories.NotificationNodeRepository;
+import org.acme.WebSocket.OnlineUserManager;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class NotificationNodeService {
+
+    @Inject
+    NotificationNodeMapper notificationNodeMapper;
+
+    @Inject
+    NotificationNodeRepository notificationNodeRepository;
+
+    @Inject
+    OnlineUserManager onlineUserManager;
+
+    private final Jsonb jsonb = JsonbBuilder.create();
+
+    public NotificationNodeDTO create(NotificationNodeDTO dto) {
+        NotificationNode entity = notificationNodeMapper.toEntity(dto);
+        if (entity.getTarget() == null) {
+            throw new IllegalArgumentException("Target ID is required");
+        }
+        notificationNodeRepository.save(entity);
+
+        NotificationNodeDTO created = notificationNodeMapper.toDTO(entity);
+
+        // Push to target if online
+        Session targetSession = onlineUserManager.getSession(dto.getTargetId());
+        if (targetSession != null && targetSession.isOpen()) {
+            Map<String, Object> response = Map.of(
+                    "type", "new_notification",
+                    "data", created
+            );
+            String json = jsonb.toJson(response);
+            targetSession.getAsyncRemote().sendText(json);
+        }
+
+        return created;
+    }
+
+    public void markAsRead(Long id) {
+        NotificationNode entity = notificationNodeRepository.findById(id);
+        if (entity == null) {
+            throw new NotFoundException("Notification not found");
+        }
+        entity.setRead(true);
+        notificationNodeRepository.save(entity);
+    }
+
+    public void delete(Long id) {
+        notificationNodeRepository.delete(id);
+    }
+
+    public List<NotificationNodeDTO> getNotificationsForUser(String targetId) {
+        return notificationNodeRepository.findByTargetId(targetId).stream()
+                .map(notificationNodeMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    public List<NotificationNodeDTO> getUnreadForUser(String userId) {
+        return notificationNodeRepository.findUnreadForUser(userId).stream()
+                .map(notificationNodeMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+}
+
+package org.acme.Services;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import jakarta.ws.rs.NotFoundException;
+import org.acme.PGDB.DTOs.UserGameListEntryDTO;
+import org.acme.PGDB.Entities.Game;
+import org.acme.PGDB.Entities.StatusEnum;
+import org.acme.PGDB.Entities.User;
+import org.acme.PGDB.Entities.UserGameListEntry;
+import org.acme.PGDB.Mappers.UserGameListEntryMapper;
+import org.acme.PGDB.Repositories.GameRepository;
+import org.acme.PGDB.Repositories.UserGameListEntryRepository;
+import org.acme.PGDB.Repositories.UserRepository;
+import org.acme.WebSocket.NotificationManager;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class UserGameListEntryService {
+
+    @Inject
+    UserGameListEntryMapper userGameListEntryMapper;
+
+    @Inject
+    UserGameListEntryRepository userGameListEntryRepository;
+
+    @Inject
+    UserRepository userRepository;
+
+    @Inject
+    GameRepository gameRepository;
+
+    @Inject
+    NotificationManager notificationManager;
+
+    @Transactional
+    public UserGameListEntryDTO create(UserGameListEntryDTO dto) {
+        UserGameListEntry entry = new UserGameListEntry();
+
+        if (dto.getUserId() == null) {
+            throw new IllegalArgumentException("User ID is required");
+        }
+        User user = userRepository.findById(dto.getUserId());
+        if (user == null) {
+            throw new NotFoundException("User not found");
+        }
+        entry.setUser(user);
+
+        if (dto.getGame() == null || dto.getGame().getId() == null) {
+            throw new IllegalArgumentException("Existing game ID is required");
+        }
+        Game game = gameRepository.findById(dto.getGame().getId());
+        if (game == null) {
+            throw new NotFoundException("Game not found");
+        }
+        entry.setGame(game);
+
+        entry.setStatus(StatusEnum.valueOf(dto.getStatus()));
+        entry.setIsFavorite(dto.getIsFavorite());
+        entry.setRating(dto.getRating());
+        entry.setReviewText(dto.getReviewText());
+
+        userGameListEntryRepository.persist(entry);
+
+        //push notifications to followers
+        notificationManager.notifyGameAdded(user.getId().toString(), user.getDisplayName(), game.getTitle());
+
+        return userGameListEntryMapper.toDTO(entry);
+    }
+
+    @Transactional
+    public UserGameListEntryDTO update(UserGameListEntryDTO dto) {
+        if (dto.getId() == null) {
+            throw new IllegalArgumentException("ID is required for update");
+        }
+
+        UserGameListEntry entry = userGameListEntryRepository.findById(dto.getId());
+        if (entry == null) {
+            throw new NotFoundException("UserGameListEntry not found");
+        }
+
+        if (dto.getStatus() != null) {
+            entry.setStatus(StatusEnum.valueOf(dto.getStatus()));
+        }
+        entry.setIsFavorite(dto.getIsFavorite());
+        entry.setRating(dto.getRating());
+        entry.setReviewText(dto.getReviewText());
+
+        userGameListEntryRepository.persist(entry);
+
+        return userGameListEntryMapper.toDTO(entry);
+    }
+
+    public List<UserGameListEntryDTO> getEntriesForUser(UUID userId) {
+        return userGameListEntryRepository.find("user.id", userId).stream()
+                .map(userGameListEntryMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        UserGameListEntry entry = userGameListEntryRepository.findById(id);
+        if (entry == null) {
+            throw new NotFoundException("UserGameListEntry not found");
+        }
+        entry.getUser().getUserGameListEntries().remove(entry);
+        entry.getGame().getUserGameListEntries().remove(entry);
+
+        userGameListEntryRepository.delete(entry);
+    }
+}
+
+package org.acme.Services;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.acme.N4JDB.Nodes.UserNode;
+import org.acme.N4JDB.Repositories.UserNodeRepository;
+import org.acme.WebSocket.NotificationManager;
+
+import java.util.Set;
+
+@ApplicationScoped
+public class UserNodeService {
+
+    @Inject
+    UserNodeRepository userNodeRepository;
+
+    @Inject
+    NotificationManager notificationManager;
+
+    public void createUserNode(String userId, String displayName) {
+        UserNode userNode = new UserNode(userId, displayName);
+        userNodeRepository.save(userNode);
+    }
+
+    public boolean follow(String followerId, String followedId) {
+        if (followerId.equals(followedId)) {
+            return false; // User cannot follow themselves
+        }
+
+        UserNode follower = userNodeRepository.findById(followerId);
+        UserNode followed = userNodeRepository.findById(followedId);
+
+        if (follower == null || followed == null) {
+            return false; // One or both users don't exist
+        }
+
+        if (follower.getFollowing().contains(followed)) {
+            return false; // Already following
+        }
+
+        follower.getFollowing().add(followed);
+        followed.getFollowers().add(follower);
+
+        userNodeRepository.save(follower);
+        userNodeRepository.save(followed);
+
+        // Create notification for the followed user
+        notificationManager.notifyFollow(followerId, followedId, follower.getDisplayName());
+
+        return true;
+    }
+
+    public boolean unfollow(String followerId, String followedId) {
+        UserNode follower = userNodeRepository.findById(followerId);
+        UserNode followed = userNodeRepository.findById(followedId);
+
+
+        if (follower == null || followed == null) {
+            return false; // One or both users don't exist
+        }
+
+        // Delete the FOLLOWS relationship directly in Neo4j
+        boolean relationshipDeleted = userNodeRepository.deleteFollowsRelationship(followerId, followedId);
+        if (!relationshipDeleted) {
+            return false; // Not following
+        }
+
+        // Create notification for the followed user
+        notificationManager.notifyUnfollow(followerId, followedId, follower.getDisplayName());
+
+        return true;
+    }
+
+    public UserNode getById(String userId) {
+        return userNodeRepository.findById(userId);
+    }
+
+    public Set<UserNode> getFollowers(String userId) {
+        return userNodeRepository.getFollowers(userId);
+    }
+}
+
+package org.acme.Services;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
+import org.acme.PGDB.DTOs.DeveloperDTO;
+import org.acme.PGDB.DTOs.UserDTO;
+import org.acme.PGDB.Entities.User;
+import org.acme.PGDB.Mappers.UserMapper;
+import org.acme.PGDB.Repositories.UserRepository;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class UserService {
+
+    @Inject
+    UserRepository userRepository;
+
+    @Inject
+    UserMapper userMapper;
+
+    @Inject
+    ImageService imageService;
+
+    @Transactional
+    public void createUser(UUID id, String displayName) {
+        User user = new User();
+        user.setId(id);
+        user.setDisplayName(displayName);
+        user.setBio(""); // Default empty
+        user.setAvatarUrl(imageService.getDefaultCoverUrl()); // Default null
+
+        userRepository.persist(user);
+    }
+
+    @Transactional
+    public UserDTO updateUser(UserDTO dto) {
+        User user = userRepository.findById(dto.getId());
+
+        user.setBio(dto.getBio());
+        user.setAvatarUrl(dto.getAvatarUrl());
+        userRepository.persist(user);
+
+        return userMapper.toDTO(user);
+    }
+
+    public User getById(UUID id) {
+        return userRepository.findById(id);
+    }
+
+    public List<UserDTO> getAll() {
+        List<UserDTO> userList = userRepository.listAll().stream()
+                .map(userMapper::toDTO)
+                .toList();
+
+        for (UserDTO userDTO : userList)
+            userDTO.setUserGameListEntries(null);
+
+        return userList;
+    }
+}

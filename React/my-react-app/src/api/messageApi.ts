@@ -1,0 +1,40 @@
+
+
+import api from './apiClient';
+import { MessageDTO } from '../types/MessageDTO';
+
+export const getMessagesBetween = async (
+    token: string, 
+    user1Id: string, 
+    user2Id: string,
+    limit: number = 100,
+    skip: number = 0
+): Promise<MessageDTO[]> => {
+    const response = await api.get(`/messages/between/${user1Id}/${user2Id}`, {
+        params: { limit, skip },
+        headers: { Authorization: `Bearer ${token}` }
+    });
+    return response.data;
+};
+
+export const markAsReadUpTo = async (token: string, lastId: number): Promise<void> => {
+    await api.put(`/messages/read-up-to/${lastId}`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+};
+
+export const editMessage = async (token: string, messageId: number, content: string): Promise<MessageDTO> => {
+    const response = await api.put(`/messages/edit/${messageId}`, 
+        { content }, 
+        {
+            headers: { Authorization: `Bearer ${token}` }
+        }
+    );
+    return response.data;
+};
+
+export const deleteMessage = async (token: string, messageId: number): Promise<void> => {
+    await api.delete(`/messages/delete/${messageId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+    });
+};

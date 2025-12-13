@@ -1,0 +1,86 @@
+export interface ArticleBlockDTO {
+    id: number;
+    position: number;
+    content: string;
+    blockType: string;
+}
+import { ArticleBlockDTO } from './ArticleBlockDTO';
+
+export interface ArticleDTO {
+    id: number;
+    title: string;
+    author: string;
+    authorId: string;
+    publishedAt: string;
+    featuredImageUrl: string | null;
+    articleBlocks: ArticleBlockDTO[];
+}
+import { UserDTO } from "./UserDTO";
+import { UserNodeDTO } from "./UserNodeDTO";
+
+export interface CombinedUserDTO {
+    relationalData: UserDTO;
+    graphData: UserNodeDTO;
+}
+export interface PublisherDTO {
+    id: number;
+    name: string;
+}
+import { DeveloperDTO } from "./DeveloperDTO";
+import { GameGenreDTO } from "./GameGenreDTO";
+import { GamePlatformDTO } from "./PlatformGenreDTO";
+import { PublisherDTO } from "./PublisherDTO";
+
+export interface GameDTO {
+    id: number;
+    title: string;
+    description: string;
+    releaseDate: string;
+    coverUrl: string | null;
+    developer: DeveloperDTO;
+    publisher: PublisherDTO;
+    gameGenres: GameGenreDTO[];
+    gamePlatforms: GamePlatformDTO[];
+}
+
+export interface DeveloperDTO {
+    id: number;
+    name: string;
+}
+export interface GameGenreDTO {
+    id: number;
+    genre: { id: number; name: string };
+}
+export interface GamePlatformDTO {
+    id: number;
+    platform: { id: number; name: string };
+}
+import { UserGameListEntryDTO } from "./UserGameListEntryDTO";
+
+export interface UserDTO {
+    id: string; // UUID converted to string
+    displayName: string;
+    bio: string;
+    avatarUrl: string;
+    userGameListEntries: UserGameListEntryDTO[];
+  }
+import { GameDTO } from "./GameDTO";
+
+export interface UserGameListEntryDTO {
+    id: number; // Long converted to number
+    userId: string; // UUID converted to string
+    game: GameDTO;
+    status: string;
+    isFavorite: boolean;
+    rating: number | null; // Integer can be null in Java, so optional in TS
+    reviewText: string | null; // String can be null in Java, so optional in TS
+  }
+export interface UserNodeDTO {
+    id: number; // Long converted to number
+    userId: string;
+    displayName: string;
+    following: Set<string>;
+    followers: Set<string>;
+    receivedMessages: Set<number>; // Long converted to number
+    receivedNotifications: Set<number>; // Long converted to number
+  }

@@ -1,0 +1,1130 @@
+
+
+package org.acme.Resources;
+
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.acme.Misc.ArticleUploadForm;
+import org.acme.PGDB.DTOs.ArticleDTO;
+import org.acme.Services.ArticleService;
+import org.acme.Services.ImageService;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
+
+import java.io.IOException;
+import java.util.List;
+
+@Path("/api/articles")
+public class ArticleResource {
+
+    @Inject
+    ArticleService articleService;
+
+    @Inject
+    ImageService imageService;
+
+    @POST
+    @Path("/create")
+    @RolesAllowed({"superuser"})
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response create(@BeanParam ArticleUploadForm form) throws IOException {
+/*        try {
+            ArticleDTO dto = form.data;
+            String imageUrl = imageService.uploadImage(form.file, dto.getFeaturedImageUrl(), "articles");
+            dto.setFeaturedImageUrl(imageUrl != null ? imageUrl : imageService.getDefaultCoverUrl());
+
+            ArticleDTO created = articleService.create(dto);
+            return Response.status(Response.Status.CREATED)
+                    .entity(created)
+                    .build();
+        } catch (IllegalArgumentException iae) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(iae.getMessage())
+                    .build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while creating article: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }*/
+        ArticleDTO dto = form.data;
+        String imageUrl = imageService.uploadImage(form.file, dto.getFeaturedImageUrl(), "articles");
+        dto.setFeaturedImageUrl(imageUrl != null ? imageUrl : imageService.getDefaultCoverUrl());
+
+        ArticleDTO created = articleService.create(dto);
+        return Response.status(Response.Status.CREATED)
+                .entity(created)
+                .build();
+    }
+
+    @PUT
+    @Path("/update")
+    @RolesAllowed({"superuser"})
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response update(@BeanParam ArticleUploadForm form) throws IOException {
+        try {
+            ArticleDTO dto = form.data;
+            String imageUrl = imageService.uploadImage(form.file, dto.getFeaturedImageUrl(), "articles");
+            if (imageUrl != null) {
+                dto.setFeaturedImageUrl(imageUrl);
+            }
+
+            ArticleDTO updated = articleService.update(dto);
+            return Response.ok(updated).build();
+        } catch (IllegalArgumentException iae) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(iae.getMessage())
+                    .build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while updating article: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/getAll")
+    @RolesAllowed({"user", "superuser"})
+    public Response getAll() {
+        try {
+            List<ArticleDTO> list = articleService.getAll();
+            return Response.ok(list).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while retrieving articles: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+}
+package org.acme.Resources;
+
+import jakarta.annotation.security.PermitAll;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Response;
+
+import java.io.File;
+
+@Path("/api/images")
+public class ImageResource {
+
+    private static final String BASE_UPLOAD_DIR = "Uploads/";
+    private static final String GAMES_UPLOAD_DIR = BASE_UPLOAD_DIR + "games/";
+    private static final String ARTICLES_UPLOAD_DIR = BASE_UPLOAD_DIR + "articles/";
+    private static final String AVATARS_UPLOAD_DIR = BASE_UPLOAD_DIR + "avatars/";
+
+    @GET
+    @Path("/games/{filename}")
+    @Produces("image/*")
+    @PermitAll
+    public Response getGameImage(@PathParam("filename") String filename) {
+        File file = new File(GAMES_UPLOAD_DIR + filename);
+        if (!file.exists()) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        return Response.ok(file).header("Content-Type", getContentType(filename)).build();
+    }
+
+    @GET
+    @Path("/articles/{filename}")
+    @Produces("image/*")
+    @PermitAll
+    public Response getArticleImage(@PathParam("filename") String filename) {
+        File file = new File(ARTICLES_UPLOAD_DIR + filename);
+        if (!file.exists()) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        return Response.ok(file).header("Content-Type", getContentType(filename)).build();
+    }
+
+    @GET
+    @Path("/avatars/{filename}")
+    @Produces("image/*")
+    @PermitAll
+    public Response getAvatarImage(@PathParam("filename") String filename) {
+        File file = new File(AVATARS_UPLOAD_DIR + filename);
+        if (!file.exists()) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        return Response.ok(file).header("Content-Type", getContentType(filename)).build();
+    }
+
+    @GET
+    @Path("/{filename}")
+    @Produces("image/*")
+    @PermitAll
+    public Response getDefaultImage(@PathParam("filename") String filename) {
+        File file = new File(BASE_UPLOAD_DIR + filename);
+        if (!file.exists()) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        return Response.ok(file).header("Content-Type", getContentType(filename)).build();
+    }
+
+    private String getContentType(String filename) {
+        if (filename.endsWith(".jpg") || filename.endsWith(".jpeg")) return "image/jpeg";
+        if (filename.endsWith(".png")) return "image/png";
+        if (filename.endsWith(".gif")) return "image/gif";
+        return "application/octet-stream";
+    }
+}
+package org.acme.Resources;
+
+import io.quarkus.oidc.UserInfo;
+import io.quarkus.security.Authenticated;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.acme.N4JDB.DTOs.UserNodeDTO;
+import org.acme.N4JDB.Mappers.UserNodeMapper;
+import org.acme.N4JDB.Nodes.UserNode;
+import org.acme.PGDB.DTOs.CombinedUserDTO;
+import org.acme.PGDB.DTOs.UserDTO;
+import org.acme.PGDB.Entities.User;
+import org.acme.PGDB.Mappers.UserMapper;
+import org.acme.Services.UserNodeService;
+import org.acme.Services.UserService;
+import org.eclipse.microprofile.jwt.JsonWebToken;
+
+import java.util.UUID;
+
+@Path("/api")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class AuthResource {
+
+    @Inject
+    SecurityIdentity identity;
+
+    @Inject
+    UserMapper userMapper;
+
+    @Inject
+    UserNodeMapper userNodeMapper;
+
+    @Inject
+    UserService userService;
+
+    @Inject
+    UserNodeService userNodeService;
+
+    @GET
+    @Path("/user/me")
+    @Authenticated
+    public Response getMyInfo() {
+        String idString = identity.getPrincipal().getName();
+        UUID uuid = UUID.fromString(idString);
+
+        // Check if records exist, create them if they don't
+        User user = userService.getById(uuid);
+        if (user == null) {
+            // Get display name from UserInfo if available
+            UserInfo userInfo = identity.getAttribute("userinfo");
+            String displayName = userInfo != null ? userInfo.getString("displayName") : null;
+
+            userService.createUser(uuid, displayName);
+            user = userService.getById(uuid);
+        }
+
+        UserNode userNode = userNodeService.getById(idString);
+        if (userNode == null) {
+            // Get display name from UserInfo if available
+            UserInfo userInfo = identity.getAttribute("userinfo");
+            String displayName = userInfo != null ? userInfo.getString("displayName") : null;
+
+            userNodeService.createUserNode(idString, displayName);
+            userNode = userNodeService.getById(idString);
+        }
+
+        if (user == null) {
+            throw new NotFoundException("Failed to create or find user in PostgreSQL");
+        }
+        if (userNode == null) {
+            throw new NotFoundException("Failed to create or find user in Neo4j");
+        }
+
+        UserDTO userDTO = userMapper.toDTO(user);
+        UserNodeDTO userNodeDTO = userNodeMapper.toDTO(userNode);
+
+        return Response.ok(new CombinedUserDTO(userDTO, userNodeDTO)).build();
+    }
+}
+package org.acme.Resources;
+
+import io.quarkus.security.Authenticated;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.acme.N4JDB.DTOs.MessageNodeDTO;
+import org.acme.N4JDB.Nodes.MessageNode;
+import org.acme.N4JDB.Repositories.MessageNodeRepository;
+import org.acme.Services.MessageNodeService;
+
+import java.util.List;
+
+@Authenticated
+@Path("/api/messages")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class MessageResource {
+
+    @Inject
+    SecurityIdentity identity;
+
+    @Inject
+    MessageNodeService service;
+
+    @Inject
+    MessageNodeRepository repository;
+
+    @PUT
+    @Path("/update")
+    @RolesAllowed({"user", "superuser"})
+    public Response update(MessageNodeDTO dto) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            MessageNode entity = repository.findById(dto.getId());
+            if (entity == null) {
+                throw new NotFoundException("Message not found");
+            }
+            if (!entity.getSender().getUserId().equals(currentUserId)) {
+                throw new ForbiddenException("You can only update your own messages");
+            }
+            MessageNodeDTO updated = service.update(dto);
+            return Response.ok(updated).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while updating message: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @PUT
+    @Path("/read/{id}")
+    @RolesAllowed({"user", "superuser"})
+    public Response markAsRead(@PathParam("id") Long id) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            MessageNode entity = repository.findById(id);
+            if (entity == null) {
+                throw new NotFoundException("Message not found");
+            }
+            if (!entity.getRecipient().getUserId().equals(currentUserId)) {
+                throw new ForbiddenException("You can only mark messages received by yourself as read");
+            }
+            service.markAsRead(id);
+            return Response.ok().build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while marking message as read: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @PUT
+    @Path("/edit/{id}")
+    @RolesAllowed({"user", "superuser"})
+    public Response editMessage(@PathParam("id") Long id, MessageNodeDTO dto) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            MessageNode entity = repository.findById(id);
+            if (entity == null) {
+                throw new NotFoundException("Message not found");
+            }
+            if (!entity.getSender().getUserId().equals(currentUserId)) {
+                throw new ForbiddenException("You can only edit your own messages");
+            }
+            dto.setId(id);
+            MessageNodeDTO updated = service.update(dto);
+            return Response.ok(updated).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while editing message: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @DELETE
+    @Path("/delete/{id}")
+    @RolesAllowed({"user", "superuser"})
+    public Response delete(@PathParam("id") Long id) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            boolean isSuperuser = identity.getRoles().contains("superuser");
+            MessageNode entity = repository.findById(id);
+            if (entity == null) {
+                throw new NotFoundException("Message not found");
+            }
+            if (!isSuperuser && !entity.getSender().equals(currentUserId)) {
+                throw new ForbiddenException("You can only delete your own messages");
+            }
+            service.delete(id);
+            return Response.ok().build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while deleting message: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/between/{user1Id}/{user2Id}")
+    @RolesAllowed({"user", "superuser"})
+    public Response getMessagesFromTo(
+            @PathParam("user1Id") String user1Id,
+            @PathParam("user2Id") String user2Id,
+            @QueryParam("limit") @DefaultValue("100") int limit,
+            @QueryParam("skip") @DefaultValue("0") int skip
+    ) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            if (!(user1Id.equals(currentUserId) || user2Id.equals(currentUserId))) {
+                throw new ForbiddenException("You can only retrieve messages where you are one of the participants");
+            }
+
+            List<MessageNodeDTO> messages = service.getMessagesBetweenPaginated(
+                    user1Id,
+                    user2Id,
+                    limit,
+                    skip
+            );
+
+            return Response.ok(messages).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while retrieving messages: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+
+    @PUT
+    @Path("/read-up-to/{lastId}")
+    @RolesAllowed({"user", "superuser"})
+    public Response markAsReadUpTo(@PathParam("lastId") Long lastId) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            service.markAsReadUpTo(lastId, currentUserId);
+            return Response.ok().build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while marking messages as read up to: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+}
+
+package org.acme.Resources;
+
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.acme.Misc.GameUploadForm;
+import org.acme.PGDB.DTOs.GameDTO;
+import org.acme.Services.GameService;
+import org.acme.Services.ImageService;
+import org.acme.Validation.DuplicateException;
+import org.acme.Validation.DuplicateValidator;
+import jakarta.ws.rs.BeanParam;
+
+import java.io.IOException;
+import java.util.List;
+
+@Path("/api/games")
+public class GameResource {
+
+    @Inject
+    GameService gameService;
+
+    @Inject
+    DuplicateValidator duplicateValidator;
+
+    @Inject
+    ImageService imageService;
+
+    @POST
+    @Path("/create")
+    @RolesAllowed({"superuser"})
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response create(@BeanParam GameUploadForm form) {
+        try {
+            GameDTO dto = form.data;
+            String coverUrl = imageService.uploadImage(form.file, dto.getCoverUrl(), "games");
+            dto.setCoverUrl(coverUrl != null ? coverUrl : imageService.getDefaultCoverUrl());
+
+            duplicateValidator.checkGameTitle(dto.getTitle());
+            GameDTO created = gameService.create(dto);
+            return Response.status(Response.Status.CREATED)
+                    .entity(created)
+                    .build();
+        } catch (DuplicateException de) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(de.getMessage())
+                    .build();
+        } catch (IllegalArgumentException iae) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(iae.getMessage())
+                    .build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while creating game: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @PUT
+    @Path("/update")
+    @RolesAllowed({"superuser"})
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response update(@BeanParam GameUploadForm form) throws IOException {
+        try {
+            GameDTO dto = form.data;
+            String coverUrl = imageService.uploadImage(form.file, dto.getCoverUrl(), "games");
+            if (coverUrl != null) {
+                dto.setCoverUrl(coverUrl);
+            }
+
+            GameDTO updated = gameService.update(dto);
+            return Response.ok(updated).build();
+        } catch (IllegalArgumentException iae) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(iae.getMessage())
+                    .build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while updating game: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/getAll")
+    @RolesAllowed({"user", "superuser"})
+    public Response getAll() {
+        try {
+            List<GameDTO> list = gameService.getAll();
+            return Response.ok(list).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while retrieving games: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+}
+package org.acme.Resources;
+
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.acme.PGDB.DTOs.DeveloperDTO;
+import org.acme.Services.DeveloperService;
+import org.acme.Validation.DuplicateException;
+import org.acme.Validation.DuplicateValidator;
+
+import java.util.List;
+
+@Path("/api/developers")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class DeveloperResource {
+
+    @Inject
+    DeveloperService developerService;
+
+    @Inject
+    DuplicateValidator duplicateValidator;
+
+    @POST
+    @Path("/create")
+    @RolesAllowed({"superuser"})
+    public Response create(DeveloperDTO dto) {
+        try {
+            duplicateValidator.checkDeveloperName(dto.getName());
+            DeveloperDTO created = developerService.create(dto);
+            return Response.status(Response.Status.CREATED)
+                    .entity(created)
+                    .build();
+        } catch (DuplicateException de) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(de.getMessage())
+                    .build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while creating developer: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/getAll")
+    @RolesAllowed({"user", "superuser"})
+    public Response getAll() {
+        try {
+            List<DeveloperDTO> list = developerService.getAll();
+            return Response.ok(list).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while retrieving developers: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+}
+package org.acme.Resources;
+
+import io.quarkus.security.Authenticated;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.acme.N4JDB.DTOs.NotificationNodeDTO;
+import org.acme.N4JDB.Nodes.NotificationNode;
+import org.acme.N4JDB.Repositories.NotificationNodeRepository;
+import org.acme.Services.NotificationNodeService;
+
+import java.util.List;
+
+@Authenticated
+@Path("/api/notifications")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class NotificationResource {
+
+    @Inject
+    SecurityIdentity identity;
+
+    @Inject
+    NotificationNodeService service;
+
+    @Inject
+    NotificationNodeRepository repository;
+
+    @PUT
+    @Path("/read/{id}")
+    @RolesAllowed({"user", "superuser"})
+    public Response markAsRead(@PathParam("id") Long id) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            NotificationNode entity = repository.findById(id);
+            if (entity == null) {
+                throw new NotFoundException("Notification not found");
+            }
+            if (!entity.getTarget().getUserId().equals(currentUserId)) {
+                throw new ForbiddenException("You can only mark your own notifications as read");
+            }
+            service.markAsRead(id);
+            return Response.ok().build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while marking notification as read: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @DELETE
+    @Path("delete/{id}")
+    @RolesAllowed({"user", "superuser"})
+    public Response delete(@PathParam("id") Long id) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            NotificationNode entity = repository.findById(id);
+            if (entity == null) {
+                throw new NotFoundException("Notification not found");
+            }
+            if (!entity.getTarget().getUserId().equals(currentUserId)) {
+                throw new ForbiddenException("You can only delete your own notifications");
+            }
+            service.delete(id);
+            return Response.ok().build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while deleting notification: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/getForUser/{targetId}")
+    @RolesAllowed({"user", "superuser"})
+    public Response getNotificationsForUser(@PathParam("targetId") String targetId) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            if (!targetId.equals(currentUserId)) {
+                throw new ForbiddenException("You can only retrieve your own notifications");
+            }
+            List<NotificationNodeDTO> notifications = service.getNotificationsForUser(targetId);
+
+            return Response.ok(notifications).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while retrieving notifications: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+}
+package org.acme.Resources;
+
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.Path;
+import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.acme.PGDB.DTOs.PublisherDTO;
+import org.acme.Services.PublisherService;
+import org.acme.Validation.DuplicateException;
+import org.acme.Validation.DuplicateValidator;
+
+import java.util.List;
+
+@Path("/api/publishers")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class PublisherResource {
+
+    @Inject
+    PublisherService publisherService;
+
+    @Inject
+    DuplicateValidator duplicateValidator;
+
+    @POST
+    @Path("/create")
+    @RolesAllowed({"superuser"})
+    public Response create(PublisherDTO dto) {
+        try {
+            duplicateValidator.checkPublisherName(dto.getName());
+            PublisherDTO created = publisherService.create(dto);
+            return Response.status(Response.Status.CREATED)
+                    .entity(created)
+                    .build();
+        } catch (DuplicateException de) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(de.getMessage())
+                    .build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while creating publisher: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/getAll")
+    @RolesAllowed({"user", "superuser"})
+    public Response getAll() {
+        try {
+            List<PublisherDTO> list = publisherService.getAll();
+            return Response.ok(list).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while retrieving publishers: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+}
+package org.acme.Resources;
+
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.acme.PGDB.DTOs.UserGameListEntryDTO;
+import org.acme.Services.UserGameListEntryService;
+
+import java.util.List;
+import java.util.UUID;
+
+@Path("/api/usergamelistentries")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class UserGameListEntryResource {
+
+    @Inject
+    UserGameListEntryService userGameListEntryService;
+
+    @Inject
+    SecurityIdentity identity;
+
+    @POST
+    @Path("/create")
+    @RolesAllowed({"user", "superuser"})
+    public Response create(UserGameListEntryDTO dto) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            if (!currentUserId.equals(dto.getUserId().toString())) {
+                throw new ForbiddenException("You can only add entries to your own list");
+            }
+            UserGameListEntryDTO created = userGameListEntryService.create(dto);
+            return Response.status(Response.Status.CREATED)
+                    .entity(created)
+                    .build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while creating user game list entry: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @PUT
+    @Path("/update")
+    @RolesAllowed({"user", "superuser"})
+    public Response update(UserGameListEntryDTO dto) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            if (!currentUserId.equals(dto.getUserId().toString())) {
+                throw new ForbiddenException("You can only update entries in your own list");
+            }
+            UserGameListEntryDTO updated = userGameListEntryService.update(dto);
+            return Response.ok(updated).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while updating user game list entry: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/getEntriesForUser/{userId}")
+    @RolesAllowed({"user", "superuser"})
+    public Response getEntriesForUser(@PathParam("userId") UUID userId) {
+        try {
+            List<UserGameListEntryDTO> list = userGameListEntryService.getEntriesForUser(userId);
+            return Response.ok(list).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while retrieving user game list entries: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @DELETE
+    @Path("/delete")
+    @RolesAllowed({"user", "superuser"})
+    public Response delete(UserGameListEntryDTO dto) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            if (!currentUserId.equals(dto.getUserId().toString())) {
+                throw new ForbiddenException("You can only delete entries from your own list");
+            }
+            userGameListEntryService.delete(dto.getId());
+            return Response.noContent().build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while deleting user game list entry: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+}
+package org.acme.Resources;
+
+import io.quarkus.oidc.UserInfo;
+import io.quarkus.security.Authenticated;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.acme.Misc.AvatarUploadForm;
+import org.acme.N4JDB.DTOs.UserNodeDTO;
+import org.acme.N4JDB.Mappers.UserNodeMapper;
+import org.acme.N4JDB.Nodes.UserNode;
+import org.acme.PGDB.DTOs.CombinedUserDTO;
+import org.acme.PGDB.DTOs.DeveloperDTO;
+import org.acme.PGDB.DTOs.UserDTO;
+import org.acme.PGDB.Entities.User;
+import org.acme.PGDB.Mappers.UserMapper;
+import org.acme.Services.ImageService;
+import org.acme.Services.UserNodeService;
+import org.acme.Services.UserService;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+@Authenticated
+@Path("/api/users")
+public class UserResource {
+
+    @Inject
+    SecurityIdentity identity;
+
+    @Inject
+    UserService userService;
+
+    @Inject
+    UserNodeService userNodeService;
+
+    @Inject
+    UserMapper userMapper;
+
+    @Inject
+    UserNodeMapper userNodeMapper;
+
+    @Inject
+    ImageService imageService;
+
+    @GET
+    @Path("/me")
+    @Authenticated
+    public Response getMyInfo() {
+        try {
+            String idString = identity.getPrincipal().getName();
+            UUID uuid = UUID.fromString(idString);
+
+            // Check if records exist, create them if they don't
+            User user = userService.getById(uuid);
+            if (user == null) {
+                // Get display name from UserInfo if available
+                UserInfo userInfo = identity.getAttribute("userinfo");
+                String displayName = userInfo != null ? userInfo.getString("displayName") : null;
+
+                userService.createUser(uuid, displayName);
+                user = userService.getById(uuid);
+            }
+
+            UserNode userNode = userNodeService.getById(idString);
+            if (userNode == null) {
+                // Get display name from UserInfo if available
+                UserInfo userInfo = identity.getAttribute("userinfo");
+                String displayName = userInfo != null ? userInfo.getString("displayName") : null;
+
+                userNodeService.createUserNode(idString, displayName);
+                userNode = userNodeService.getById(idString);
+            }
+
+            if (user == null) {
+                throw new NotFoundException("Failed to create or find user in PostgreSQL");
+            }
+            if (userNode == null) {
+                throw new NotFoundException("Failed to create or find user in Neo4j");
+            }
+
+            UserDTO userDTO = userMapper.toDTO(user);
+            UserNodeDTO userNodeDTO = userNodeMapper.toDTO(userNode);
+
+            return Response.ok(new CombinedUserDTO(userDTO, userNodeDTO)).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while getting my info: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/{userId}")
+    public Response getUser(@PathParam("userId") String userId) {
+        try {
+            UUID uuid = UUID.fromString(userId);
+
+            User user = userService.getById(uuid);
+            if (user == null) {
+                throw new NotFoundException("User not found in PostgreSQL");
+            }
+
+            UserDTO userDTO = userMapper.toDTO(user);
+
+            return Response.ok(userDTO).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while getting user: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("/getAll")
+    @RolesAllowed({"user", "superuser"})
+    public Response getAll() {
+        try {
+            List<UserDTO> list = userService.getAll();
+            return Response.ok(list).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while retrieving users: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("followers/{userId}")
+    public Response getUserFollowers(@PathParam("userId") String userId) {
+        try {
+            UserNode userNode = userNodeService.getById(userId);
+            if (userNode == null) {
+                throw new NotFoundException("User not found in Neo4j");
+            }
+
+            Set<UserNode> followers = userNode.getFollowers();
+            List<UserDTO> dtos = new ArrayList<>();
+            for (UserNode followerNode : followers) {
+                UUID uuid = UUID.fromString(followerNode.getUserId());
+                User user = userService.getById(uuid);
+                if (user != null) {
+                    UserDTO dto = userMapper.toDTO(user);
+                    dto.setUserGameListEntries(null);
+                    dtos.add(dto);
+                }
+            }
+
+            return Response.ok(dtos).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while getting user followers: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @GET
+    @Path("following/{userId}")
+    public Response getUserFollowing(@PathParam("userId") String userId) {
+        try {
+            UserNode userNode = userNodeService.getById(userId);
+            if (userNode == null) {
+                throw new NotFoundException("User not found in Neo4j");
+            }
+
+            Set<UserNode> following = userNode.getFollowing();
+            List<UserDTO> dtos = new ArrayList<>();
+            for (UserNode followedNode : following) {
+                UUID uuid = UUID.fromString(followedNode.getUserId());
+                User user = userService.getById(uuid);
+                if (user != null) {
+                    UserDTO dto = userMapper.toDTO(user);
+                    dto.setUserGameListEntries(null);
+                    dtos.add(dto);
+                }
+            }
+
+            return Response.ok(dtos).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while getting user following: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @PUT
+    @Path("/update")
+    @RolesAllowed({"user", "superuser"})
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response update(@BeanParam AvatarUploadForm form) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            UserDTO userDTO = form.getData();
+            if (!currentUserId.equals(userDTO.getId().toString())) {
+                throw new ForbiddenException("You can only update your own profile");
+            }
+
+            String avatarUrl = imageService.uploadImage(form.file, userDTO.getAvatarUrl(), "avatars");
+            if (avatarUrl != null) {
+                userDTO.setAvatarUrl(avatarUrl);
+            }
+
+            UserDTO updatedUserDTO = userService.updateUser(userDTO);
+            return Response.ok(updatedUserDTO).build();
+        } catch (IllegalArgumentException iae) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(iae.getMessage())
+                    .build();
+        }  catch (Exception e) {
+            String msg = "Unexpected error while updating user: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @POST
+    @Path("/follow/{followedId}")
+    @RolesAllowed({"user", "superuser"})
+    public Response followUser(@PathParam("followedId") String followedId) {
+        try {
+            String followerId = identity.getPrincipal().getName();
+            boolean success = userNodeService.follow(followerId, followedId);
+            if (success) {
+                return Response.ok().build();
+            } else {
+                return Response.status(Response.Status.BAD_REQUEST).build();
+            }
+        } catch (Exception e) {
+            String msg = "Unexpected error while following user: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+
+    @DELETE
+    @Path("/unfollow/{followedId}")
+    @RolesAllowed({"user", "superuser"})
+    public Response unfollowUser(@PathParam("followedId") String followedId) {
+        try {
+            String followerId = identity.getPrincipal().getName();
+            boolean success = userNodeService.unfollow(followerId, followedId);
+            if (success) {
+                return Response.ok().build();
+            } else {
+                return Response.status(Response.Status.BAD_REQUEST).build();
+            }
+        } catch (Exception e) {
+            String msg = "Unexpected error while unfollowing user: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }
+}

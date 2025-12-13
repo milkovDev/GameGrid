@@ -1,0 +1,189 @@
+package org.acme.N4JDB.Mappers;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.acme.N4JDB.DTOs.MessageNodeDTO;
+import org.acme.N4JDB.Nodes.MessageNode;
+import org.acme.N4JDB.Nodes.UserNode;
+import org.acme.N4JDB.Repositories.UserNodeRepository;
+
+@ApplicationScoped
+public class MessageNodeMapper {
+
+    @Inject
+    UserNodeRepository userNodeRepository;
+
+    public MessageNodeDTO toDTO(MessageNode messageNode) {
+        if (messageNode == null) {
+            return null;
+        }
+
+        MessageNodeDTO dto = new MessageNodeDTO();
+        dto.setId(messageNode.getId());
+        dto.setContent(messageNode.getContent());
+        dto.setCreatedAt(messageNode.getCreatedAt());
+        dto.setRead(messageNode.getRead());
+
+        // Extract sender and recipient IDs from relationships
+        dto.setSenderId(messageNode.getSender() != null ? messageNode.getSender().getUserId() : null);
+        dto.setRecipientId(messageNode.getRecipient() != null ? messageNode.getRecipient().getUserId() : null);
+
+        return dto;
+    }
+
+    public MessageNode toEntity(MessageNodeDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        MessageNode messageNode = new MessageNode();
+        messageNode.setContent(dto.getContent());
+        messageNode.setCreatedAt(dto.getCreatedAt());
+        messageNode.setRead(dto.getRead());
+
+        // Set relationships if IDs are provided
+        if (dto.getSenderId() != null) {
+            UserNode sender = userNodeRepository.findById(dto.getSenderId());
+            if (sender == null) {
+                throw new IllegalArgumentException("Sender with ID " + dto.getSenderId() + " not found");
+            }
+            messageNode.setSender(sender);
+        }
+
+        if (dto.getRecipientId() != null) {
+            UserNode recipient = userNodeRepository.findById(dto.getRecipientId());
+            if (recipient == null) {
+                throw new IllegalArgumentException("Recipient with ID " + dto.getRecipientId() + " not found");
+            }
+            messageNode.setRecipient(recipient);
+        }
+
+        return messageNode;
+    }
+}
+
+package org.acme.N4JDB.Mappers;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.acme.N4JDB.DTOs.NotificationNodeDTO;
+import org.acme.N4JDB.Nodes.NotificationNode;
+import org.acme.N4JDB.Nodes.UserNode;
+import org.acme.N4JDB.Repositories.UserNodeRepository;
+
+@ApplicationScoped
+public class NotificationNodeMapper {
+
+    @Inject
+    UserNodeRepository userNodeRepository;
+
+    public NotificationNodeDTO toDTO(NotificationNode notificationNode) {
+        if (notificationNode == null) {
+            return null;
+        }
+
+        NotificationNodeDTO dto = new NotificationNodeDTO();
+        dto.setId(notificationNode.getId());
+        dto.setContent(notificationNode.getContent());
+        dto.setCreatedAt(notificationNode.getCreatedAt());
+        dto.setRead(notificationNode.getRead());
+        dto.setTargetId(notificationNode.getTarget() != null ? notificationNode.getTarget().getUserId() : null);
+
+        return dto;
+    }
+
+    public NotificationNode toEntity(NotificationNodeDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        NotificationNode notificationNode = new NotificationNode();
+        notificationNode.setContent(dto.getContent());
+        notificationNode.setCreatedAt(dto.getCreatedAt());
+        notificationNode.setRead(dto.getRead());
+
+        if (dto.getTargetId() != null) {
+            UserNode target = userNodeRepository.findById(dto.getTargetId());
+            notificationNode.setTarget(target);
+        }
+
+        return notificationNode;
+    }
+}
+
+package org.acme.N4JDB.Mappers;
+
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.acme.N4JDB.DTOs.UserNodeDTO;
+import org.acme.N4JDB.Nodes.MessageNode;
+import org.acme.N4JDB.Nodes.NotificationNode;
+import org.acme.N4JDB.Nodes.UserNode;
+import org.acme.N4JDB.Repositories.UserNodeRepository;
+
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@ApplicationScoped
+public class UserNodeMapper {
+
+    @Inject
+    UserNodeRepository userNodeRepository;
+
+    public UserNodeDTO toDTO(UserNode userNode) {
+        if (userNode == null) {
+            return null;
+        }
+
+        UserNodeDTO dto = new UserNodeDTO();
+        dto.setId(userNode.getId());
+        dto.setUserId(userNode.getUserId());
+        dto.setDisplayName(userNode.getDisplayName());
+
+        Set<String> following = userNode.getFollowing() != null
+                ? userNode.getFollowing().stream()
+                .map(UserNode::getUserId)
+                .collect(Collectors.toSet())
+                : new HashSet<>();
+        dto.setFollowing(following);
+
+        Set<String> followers = userNode.getFollowers() != null
+                ? userNode.getFollowers().stream()
+                .map(UserNode::getUserId)
+                .collect(Collectors.toSet())
+                : new HashSet<>();
+        dto.setFollowers(followers);
+
+        return dto;
+    }
+
+    public UserNode toEntity(UserNodeDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+
+        UserNode userNode = new UserNode();
+        userNode.setUserId(dto.getUserId());
+        userNode.setDisplayName(dto.getDisplayName());
+
+        if (dto.getFollowing() != null) {
+            Set<UserNode> following = dto.getFollowing().stream()
+                    .map(userNodeRepository::findById)
+                    .filter(follow -> follow != null)
+                    .collect(Collectors.toSet());
+            userNode.setFollowing(following);
+        }
+
+        if (dto.getFollowers() != null) {
+            Set<UserNode> followers = dto.getFollowers().stream()
+                    .map(userNodeRepository::findById)
+                    .filter(follow -> follow != null)
+                    .collect(Collectors.toSet());
+            userNode.setFollowers(followers);
+        }
+
+        return userNode;
+    }
+}

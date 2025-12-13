@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Test Client</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .connecting { background-color: #fff3cd; color: #856404; }
+        
+        input, button, textarea {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .messages {
+            border: 1px solid #ddd;
+            height: 300px;
+            overflow-y: scroll;
+            padding: 10px;
+            background-color: #f8f9fa;
+            white-space: pre-wrap;
+        }
+        .send-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .send-form input {
+            flex: 1;
+            min-width: 120px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebSocket Test Client</h1>
+        
+        <div>
+            <label>User ID: </label>
+            <input type="text" id="userId" placeholder="test-user-123" value="test-user-123">
+            <br><br>
+            <label>JWT Token: </label>
+            <textarea id="jwtToken" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." rows="3" style="width: 500px;"></textarea>
+            <br><br>
+            <button id="connectBtn" onclick="connect()">Connect</button>
+            <button id="disconnectBtn" onclick="disconnect()" disabled>Disconnect</button>
+        </div>
+
+        <div id="status" class="status disconnected">Disconnected</div>
+
+        <div class="send-form">
+            <label>Recipient ID: </label>
+            <input type="text" id="recipientId" placeholder="recipient-user-456">
+            <label>Message: </label>
+            <input type="text" id="messageContent" placeholder="Hello there!">
+            <button id="sendBtn" onclick="sendMessage()" disabled>Send Message</button>
+        </div>
+
+        <h3>Messages:</h3>
+        <div id="messages" class="messages"></div>
+        
+        <button onclick="clearMessages()">Clear Messages</button>
+    </div>
+
+    <script>
+        let ws = null;
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+
+        function updateStatus(message, className) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status ${className}`;
+        }
+
+        function addMessage(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            messagesDiv.textContent += `[${timestamp}] ${message}\n`;
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function connect() {
+            const userId = document.getElementById('userId').value;
+            const token = document.getElementById('jwtToken').value;
+            
+            if (!userId) {
+                alert('Please enter a User ID');
+                return;
+            }
+            
+            if (!token) {
+                alert('Please enter a JWT Token for authentication');
+                return;
+            }
+
+            updateStatus('Connecting...', 'connecting');
+            
+            // Include JWT token in WebSocket connection
+            ws = new WebSocket(`ws://localhost:8080/ws/realtime/${userId}?token=${encodeURIComponent(token)}`);
+
+            ws.onopen = function() {
+                updateStatus('Connected', 'connected');
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                sendBtn.disabled = false;
+                addMessage('✅ WebSocket connected');
+            };
+
+            ws.onmessage = function(event) {
+                addMessage('📨 Received: ' + event.data);
+                
+                // Try to parse and display nicely
+                try {
+                    const parsed = JSON.parse(event.data);
+                    addMessage('📋 Parsed: ' + JSON.stringify(parsed, null, 2));
+                } catch(e) {
+                    addMessage('⚠️  Could not parse as JSON');
+                }
+            };
+
+            ws.onclose = function(event) {
+                updateStatus('Disconnected', 'disconnected');
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                sendBtn.disabled = true;
+                addMessage(`❌ Connection closed: ${event.code} - ${event.reason}`);
+            };
+
+            ws.onerror = function(error) {
+                updateStatus('Error', 'disconnected');
+                addMessage('💥 WebSocket error occurred');
+                console.error('WebSocket error:', error);
+            };
+
+            ws.onclose = function(event) {
+                updateStatus('Disconnected', 'disconnected');
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                sendBtn.disabled = true;
+                addMessage(`❌ Connection closed: Code ${event.code} - ${event.reason || 'No reason provided'}`);
+                console.log('WebSocket closed:', event);
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+            }
+        }
+
+        function sendMessage() {
+            const recipientId = document.getElementById('recipientId').value;
+            const content = document.getElementById('messageContent').value;
+
+            if (!recipientId || !content) {
+                alert('Please fill in both recipient ID and message content');
+                return;
+            }
+
+            const message = {
+                type: "send_message",
+                data: {
+                    recipientId: recipientId,
+                    content: content
+                }
+            };
+
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(message));
+                addMessage('📤 Sent: ' + JSON.stringify(message));
+                
+                // Clear the message input
+                document.getElementById('messageContent').value = '';
+            } else {
+                alert('WebSocket is not connected');
+            }
+        }
+
+        function clearMessages() {
+            messagesDiv.textContent = '';
+        }
+
+        // Allow Enter key to send message
+        document.getElementById('messageContent').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

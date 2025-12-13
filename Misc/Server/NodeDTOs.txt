@@ -1,0 +1,92 @@
+package org.acme.N4JDB.DTOs;
+
+import java.time.Instant;
+import java.util.UUID;
+
+public class MessageNodeDTO {
+    private UUID id;
+    private String content;
+    private Instant createdAt;
+    private Boolean read;
+    private UUID senderId;
+    private UUID recipientId;
+
+    public MessageNodeDTO() {}
+
+    // Getters and Setters
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public Boolean getRead() { return read; }
+    public void setRead(Boolean read) { this.read = read; }
+    public UUID getSenderId() { return senderId; }
+    public void setSenderId(UUID senderId) { this.senderId = senderId; }
+    public UUID getRecipientId() { return recipientId; }
+    public void setRecipientId(UUID recipientId) { this.recipientId = recipientId; }
+}
+
+package org.acme.N4JDB.DTOs;
+
+import java.time.Instant;
+import java.util.UUID;
+
+public class NotificationNodeDTO {
+    private UUID id;
+    private String content;
+    private Instant createdAt;
+    private Boolean read;
+    private UUID targetId;
+    private UUID triggererId;
+
+    public NotificationNodeDTO() {}
+
+    // Getters and Setters
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public String getContent() { return content; }
+    public void setContent(String content) { this.content = content; }
+    public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public Boolean getRead() { return read; }
+    public void setRead(Boolean read) { this.read = read; }
+    public UUID getTargetId() { return targetId; }
+    public void setTargetId(UUID targetId) { this.targetId = targetId; }
+    public UUID getTriggererId() { return triggererId; }
+    public void setTriggererId(UUID triggererId) { this.triggererId = triggererId; }
+}
+
+package org.acme.N4JDB.DTOs;
+
+import java.util.Set;
+import java.util.UUID;
+
+public class UserNodeDTO {
+    private UUID userId;
+    private String displayName;
+    private Set<UUID> follows;
+    private Set<UUID> followedBy;
+    private Set<UUID> sentMessages;
+    private Set<UUID> triggeredNotifications;
+
+    // Default Constructor
+    public UserNodeDTO() {}
+
+    // Getters and Setters
+    public UUID getUserId() { return userId; }
+    public void setUserId(UUID userId) { this.userId = userId; }
+    public String getDisplayName() { return displayName; }
+    public void setDisplayName(String displayName) { this.displayName = displayName; }
+    public Set<UUID> getFollows() { return follows; }
+    public void setFollows(Set<UUID> follows) { this.follows = follows; }
+    public Set<UUID> getFollowedBy() { return followedBy; }
+    public void setFollowedBy(Set<UUID> followedBy) { this.followedBy = followedBy; }
+    public Set<UUID> getSentMessages() { return sentMessages; }
+    public void setSentMessages(Set<UUID> sentMessages) { this.sentMessages = sentMessages; }
+    public Set<UUID> getTriggeredNotifications() { return triggeredNotifications; }
+    public void setTriggeredNotifications(Set<UUID> triggeredNotifications) {
+        this.triggeredNotifications = triggeredNotifications;
+    }
+}

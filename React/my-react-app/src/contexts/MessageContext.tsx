@@ -1,0 +1,560 @@
+// MessageContext.tsx - Fixed version with periodic marking
+
+import React, { createContext, useState, useEffect, useContext, useCallback, useMemo, useRef } from 'react';
+import { useAuth } from './AuthContext';
+import { useRealtime } from './RealTimeContext';
+import { MessageDTO } from '../types/MessageDTO';
+import { UserDTO } from '../types/UserDTO';
+import { getMessagesBetween, markAsReadUpTo } from '../api/messageApi';
+import { getById } from '../api/userApi';
+import { audioNotificationManager } from '../utils/audioNotifications';
+import { StorageManager } from '../utils/StorageManager';
+
+export interface Chat {
+  userId: string;
+  messages: MessageDTO[];
+  unreadCount: number;
+  userInfo?: UserDTO;
+  hasMoreMessages: boolean;
+  totalLoaded: number;
+}
+
+interface MessageContextType {
+  chats: Map<string, Chat>;
+  activeChats: string[];
+  selectedChatUserId: string | null;
+  totalUnreadCount: number;
+  isLoading: boolean;
+  showChatBox: boolean;
+  selectChat: (userId: string, shouldMarkAsRead?: boolean) => Promise<void>;
+  loadMoreMessages: (userId: string) => Promise<void>;
+  sendMessage: (recipientId: string, content: string) => void;
+  editMessage: (messageId: number, content: string) => void;
+  deleteMessage: (messageId: number) => void;
+  markChatAsRead: (userId: string) => Promise<void>;
+  addMessage: (message: MessageDTO, isRealTime?: boolean) => void;
+  activateChat: (userId: string) => Promise<void>;
+  closeChat: (userId: string) => void;
+  openChatBox: (specificUserId?: string) => void;
+  closeChatBox: () => void;
+  updateMessageInChat: (messageId: number, newContent: string) => void;
+  removeMessageFromChat: (messageId: number) => void;
+  openChatWith: (userId: string) => Promise<void>;
+}
+
+const MessageContext = createContext<MessageContextType | undefined>(undefined);
+
+const PAGE_SIZE = 20;
+
+export const MessageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const auth = useAuth();
+  const realtime = useRealtime();
+  const [chats, setChats] = useState<Map<string, Chat>>(new Map());
+  const [activeChats, setActiveChats] = useState<string[]>([]);
+  const [selectedChatUserId, setSelectedChatUserId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showChatBox, setShowChatBox] = useState(false);
+
+  const storageManager = useMemo(() => new StorageManager(auth.userId), [auth.userId]);
+
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      audioNotificationManager.requestAudioPermission();
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
+
+    document.addEventListener('click', handleFirstInteraction);
+    document.addEventListener('keydown', handleFirstInteraction);
+
+    return () => {
+      document.removeEventListener('click', handleFirstInteraction);
+      document.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (auth.isAuthenticated && auth.userId) {
+      const userChats = storageManager.getActiveChats();
+      setActiveChats(userChats);
+
+      userChats.forEach(async (userId: string) => {
+        setChats((prev) => {
+          const newChats = new Map(prev);
+          if (!newChats.has(userId)) {
+            newChats.set(userId, { 
+              userId, 
+              messages: [], 
+              unreadCount: 0,
+              hasMoreMessages: true,
+              totalLoaded: 0
+            });
+          }
+          return newChats;
+        });
+
+        if (auth.token) {
+          try {
+            const userInfo = await getById(auth.token, userId);
+            setChats((prev) => {
+              const newChats = new Map(prev);
+              const existingChat = newChats.get(userId);
+              if (existingChat) {
+                newChats.set(userId, { ...existingChat, userInfo });
+              }
+              return newChats;
+            });
+          } catch (error) {
+            console.error('Failed to load user info for chat:', userId, error);
+          }
+        }
+      });
+    }
+  }, [auth.isAuthenticated, auth.userId, auth.token, storageManager]);
+
+  const totalUnreadCount = useMemo(() => 
+    Array.from(chats.values()).reduce((total, chat) => total + chat.unreadCount, 0), 
+    [chats]
+  );
+
+  const activateChat = useCallback(
+    async (userId: string) => {
+      if (!auth.token || userId === auth.userId) return;
+
+      setChats((prev) => {
+        const newChats = new Map(prev);
+        if (!newChats.has(userId)) {
+          newChats.set(userId, { 
+            userId, 
+            messages: [], 
+            unreadCount: 0,
+            hasMoreMessages: true,
+            totalLoaded: 0
+          });
+        }
+        return newChats;
+      });
+
+      try {
+        const userInfo = await getById(auth.token, userId);
+        
+        setChats((prev) => {
+          const newChats = new Map(prev);
+          const chat = newChats.get(userId);
+          if (chat) {
+            newChats.set(userId, { ...chat, userInfo });
+          }
+          return newChats;
+        });
+
+        setActiveChats((prev) => {
+          if (!prev.includes(userId)) {
+            const newActiveChats = [...prev, userId];
+            storageManager.saveActiveChats(newActiveChats);
+            return newActiveChats;
+          }
+          return prev;
+        });
+      } catch (error) {
+        console.error('Failed to load user info:', error);
+        setActiveChats((prev) => {
+          if (!prev.includes(userId)) {
+            const newActiveChats = [...prev, userId];
+            storageManager.saveActiveChats(newActiveChats);
+            return newActiveChats;
+          }
+          return prev;
+        });
+      }
+    },
+    [auth.token, auth.userId, storageManager]
+  );
+
+  const closeChat = useCallback(
+    (userId: string) => {
+      setActiveChats((prev) => {
+        const newActiveChats = prev.filter((id) => id !== userId);
+        storageManager.saveActiveChats(newActiveChats);
+        return newActiveChats;
+      });
+
+      setChats((prev) => {
+        const newChats = new Map(prev);
+        newChats.delete(userId);
+        return newChats;
+      });
+
+      if (selectedChatUserId === userId) {
+        setSelectedChatUserId(null);
+      }
+    },
+    [storageManager, selectedChatUserId]
+  );
+
+  const addMessage = useCallback(
+    (message: MessageDTO, isRealTime = false) => {
+      const otherUserId = message.senderId === auth.userId ? message.recipientId : message.senderId;
+
+      const isCurrentlyViewing = selectedChatUserId === otherUserId && showChatBox;
+      let isNearBottom = true;
+      
+      if (isCurrentlyViewing) {
+        const messagesArea = document.querySelector('.chat-messages-area');
+        if (messagesArea) {
+          const { scrollTop, scrollHeight, clientHeight } = messagesArea;
+          isNearBottom = scrollHeight - scrollTop - clientHeight < 200;
+        }
+      }
+
+      if (isRealTime && message.senderId !== auth.userId) {
+        audioNotificationManager.playMessageSound();
+      }
+
+      setChats((prev) => {
+        const newChats = new Map(prev);
+        const existingChat = newChats.get(otherUserId);
+
+        if (existingChat) {
+          if (!existingChat.messages.some((m) => m.id === message.id)) {
+            const newMessages = [...existingChat.messages, message].sort(
+              (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            );
+            
+            const shouldShowUnread = 
+              message.senderId !== auth.userId && 
+              !message.read && 
+              (!isCurrentlyViewing || !isNearBottom);
+
+            const newUnreadCount = shouldShowUnread
+              ? existingChat.unreadCount + 1
+              : existingChat.unreadCount;
+
+            newChats.set(otherUserId, { 
+              ...existingChat, 
+              messages: newMessages, 
+              unreadCount: newUnreadCount 
+            });
+          }
+        } else {
+          const unreadCount = message.senderId !== auth.userId && !message.read && !isCurrentlyViewing ? 1 : 0;
+
+          newChats.set(otherUserId, { 
+            userId: otherUserId, 
+            messages: [message], 
+            unreadCount,
+            hasMoreMessages: true,
+            totalLoaded: 1
+          });
+
+          setActiveChats((prev) => {
+            if (!prev.includes(otherUserId)) {
+              const newActiveChats = [...prev, otherUserId];
+              storageManager.saveActiveChats(newActiveChats);
+              return newActiveChats;
+            }
+            return prev;
+          });
+
+          if (auth.token) {
+            getById(auth.token, otherUserId)
+              .then((userInfo) => {
+                setChats((prevChats) => {
+                  const updatedChats = new Map(prevChats);
+                  const chat = updatedChats.get(otherUserId);
+                  if (chat) {
+                    updatedChats.set(otherUserId, { ...chat, userInfo });
+                  }
+                  return updatedChats;
+                });
+              })
+              .catch((error) => console.error('Failed to load user info for new chat:', error));
+          }
+        }
+
+        return newChats;
+      });
+    },
+    [auth.userId, auth.token, storageManager, selectedChatUserId, showChatBox]
+  );
+
+  const updateMessageInChat = useCallback((messageId: number, newContent: string) => {
+    setChats((prev) => {
+      const newChats = new Map(prev);
+      newChats.forEach((chat, userId) => {
+        const messageIndex = chat.messages.findIndex((m: MessageDTO) => m.id === messageId);
+        if (messageIndex !== -1) {
+          const updatedMessages = [...chat.messages];
+          updatedMessages[messageIndex] = { ...updatedMessages[messageIndex], content: newContent };
+          newChats.set(userId, { ...chat, messages: updatedMessages });
+        }
+      });
+      return newChats;
+    });
+  }, []);
+
+  const removeMessageFromChat = useCallback((messageId: number) => {
+    setChats((prev) => {
+      const newChats = new Map(prev);
+      newChats.forEach((chat, userId) => {
+        const messageIndex = chat.messages.findIndex((m: MessageDTO) => m.id === messageId);
+        if (messageIndex !== -1) {
+          const updatedMessages = chat.messages.filter((m: MessageDTO) => m.id !== messageId);
+          newChats.set(userId, { ...chat, messages: updatedMessages });
+        }
+      });
+      return newChats;
+    });
+  }, []);
+
+  const markChatAsRead = useCallback(
+    async (userId: string) => {
+      if (!auth.token) return;
+      const chat = chats.get(userId);
+      if (chat && chat.messages.length > 0) {
+        try {
+          const lastMessage = chat.messages[chat.messages.length - 1];
+          await markAsReadUpTo(auth.token, lastMessage.id);
+
+          setChats((prev) => {
+            const newChats = new Map(prev);
+            const existingChat = newChats.get(userId);
+            if (existingChat) {
+              newChats.set(userId, {
+                ...existingChat,
+                unreadCount: 0,
+                messages: existingChat.messages.map((m) => ({ ...m, read: true })),
+              });
+            }
+            return newChats;
+          });
+        } catch (error) {
+          console.error('Failed to mark chat as read:', error);
+        }
+      }
+    },
+    [auth.token, chats]
+  );
+
+  // Create a ref to hold the latest markChatAsRead function
+  const markChatAsReadRef = useRef(markChatAsRead);
+
+  // Update the ref whenever markChatAsRead changes
+  useEffect(() => {
+    markChatAsReadRef.current = markChatAsRead;
+  }, [markChatAsRead]);
+
+  const selectChat = useCallback(
+    async (userId: string, shouldMarkAsRead = true) => {
+      if (!auth.token) return;
+      
+      setIsLoading(true);
+      setSelectedChatUserId(userId);
+
+      let existingChat: Chat | undefined;
+      setChats((prev) => {
+        existingChat = prev.get(userId);
+        return prev;
+      });
+
+      if (existingChat && existingChat.messages.length > 0) {
+        setIsLoading(false);
+        if (shouldMarkAsRead) {
+          await markChatAsRead(userId);
+        }
+        return;
+      }
+
+      try {
+        const messages = await getMessagesBetween(auth.token, auth.userId!, userId, PAGE_SIZE, 0);
+
+        setChats((prev) => {
+          const newChats = new Map(prev);
+          const currentChat = newChats.get(userId);
+
+          newChats.set(userId, {
+            ...(currentChat || { userId, unreadCount: 0 }),
+            messages: messages,
+            unreadCount: shouldMarkAsRead ? 0 : currentChat?.unreadCount || 0,
+            hasMoreMessages: messages.length === PAGE_SIZE,
+            totalLoaded: messages.length,
+            userInfo: currentChat?.userInfo
+          });
+
+          return newChats;
+        });
+
+        if (shouldMarkAsRead) {
+          await markChatAsRead(userId);
+        }
+      } catch (error) {
+        console.error('Failed to load chat:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [auth.token, auth.userId, markChatAsRead]
+  );
+
+  const loadMoreMessages = useCallback(
+    async (userId: string) => {
+      if (!auth.token) return;
+      
+      const chat = chats.get(userId);
+      if (!chat || !chat.hasMoreMessages) return;
+
+      try {
+        const skip = chat.totalLoaded;
+        const olderMessages = await getMessagesBetween(auth.token, auth.userId!, userId, PAGE_SIZE, skip);
+
+        setChats((prev) => {
+          const newChats = new Map(prev);
+          const existingChat = newChats.get(userId);
+          
+          if (existingChat) {
+            const existingIds = new Set(existingChat.messages.map(m => m.id));
+            const uniqueOlderMessages = olderMessages.filter(m => !existingIds.has(m.id));
+            const combinedMessages = [...uniqueOlderMessages, ...existingChat.messages];
+            
+            newChats.set(userId, {
+              ...existingChat,
+              messages: combinedMessages,
+              hasMoreMessages: olderMessages.length === PAGE_SIZE,
+              totalLoaded: existingChat.totalLoaded + uniqueOlderMessages.length
+            });
+          }
+          
+          return newChats;
+        });
+      } catch (error) {
+        console.error('Failed to load more messages:', error);
+      }
+    },
+    [auth.token, auth.userId, chats]
+  );
+
+  const openChatBox = useCallback(async (specificUserId?: string) => {
+    setShowChatBox(true);
+    
+    if (specificUserId) {
+      storageManager.saveLastOpenChat(specificUserId);
+      await selectChat(specificUserId, false);
+    } else {
+      const lastChatUserId = storageManager.getLastOpenChat();
+      if (lastChatUserId && activeChats.includes(lastChatUserId)) {
+        await selectChat(lastChatUserId, false);
+      }
+    }
+  }, [storageManager, activeChats, selectChat]);
+
+  const closeChatBox = useCallback(() => {
+    setShowChatBox(false);
+    if (selectedChatUserId) {
+      storageManager.saveLastOpenChat(selectedChatUserId);
+      
+      setChats((prev) => {
+        const newChats = new Map(prev);
+        const chat = newChats.get(selectedChatUserId);
+        
+        if (chat && chat.messages.length > PAGE_SIZE) {
+          const recentMessages = chat.messages.slice(-PAGE_SIZE);
+          newChats.set(selectedChatUserId, {
+            ...chat,
+            messages: recentMessages,
+            hasMoreMessages: true,
+            totalLoaded: PAGE_SIZE
+          });
+        }
+        
+        return newChats;
+      });
+    }
+    setSelectedChatUserId(null);
+  }, [storageManager, selectedChatUserId]);
+
+  const openChatWith = useCallback(async (userId: string) => {
+    await activateChat(userId);
+    storageManager.saveLastOpenChat(userId);
+    setShowChatBox(true);
+    await selectChat(userId, true);
+  }, [activateChat, selectChat, storageManager]);
+
+  const sendMessage = useCallback((recipientId: string, content: string) => {
+    realtime.sendMessage(recipientId, content);
+    markChatAsRead(recipientId);
+  }, [realtime, markChatAsRead]);
+
+  const editMessage = useCallback((messageId: number, content: string) => realtime.editMessage(messageId, content), [realtime]);
+
+  const deleteMessage = useCallback((messageId: number) => realtime.deleteMessage(messageId), [realtime]);
+
+  useEffect(() => {
+    const unsubNewMessage = realtime.subscribe('new_message', (data) => addMessage(data as MessageDTO, true));
+    const unsubUnreadMessages = realtime.subscribe('unread_messages', (data) => {
+      const unreadMessages = data as MessageDTO[];
+      const messagesByUser = new Map<string, MessageDTO[]>();
+      unreadMessages.forEach((message) => {
+        const otherUserId = message.senderId === auth.userId ? message.recipientId : message.senderId;
+        if (!messagesByUser.has(otherUserId)) messagesByUser.set(otherUserId, []);
+        messagesByUser.get(otherUserId)!.push(message);
+      });
+      messagesByUser.forEach((messages) => messages.forEach((message) => addMessage(message, false)));
+    });
+    const unsubMessageEdited = realtime.subscribe('message_edited', (data) => {
+      const editedMessage = data as MessageDTO;
+      updateMessageInChat(editedMessage.id!, editedMessage.content);
+    });
+    const unsubMessageDeleted = realtime.subscribe('message_deleted', (data) => {
+      const { messageId } = data as { messageId: number };
+      removeMessageFromChat(messageId);
+    });
+
+    return () => {
+      unsubNewMessage();
+      unsubUnreadMessages();
+      unsubMessageEdited();
+      unsubMessageDeleted();
+    };
+  }, [realtime, addMessage, auth.userId, updateMessageInChat, removeMessageFromChat]);
+
+  // Periodic marking as read - using ref to avoid stale closure
+  useEffect(() => {
+    if (!selectedChatUserId || !showChatBox) return;
+    const interval = setInterval(() => markChatAsReadRef.current(selectedChatUserId), 30000);
+    return () => clearInterval(interval);
+  }, [selectedChatUserId, showChatBox]);
+
+  return (
+    <MessageContext.Provider
+      value={{
+        chats,
+        activeChats,
+        selectedChatUserId,
+        totalUnreadCount,
+        isLoading,
+        showChatBox,
+        selectChat,
+        loadMoreMessages,
+        sendMessage,
+        editMessage,
+        deleteMessage,
+        markChatAsRead,
+        addMessage,
+        activateChat,
+        closeChat,
+        openChatBox,
+        closeChatBox,
+        updateMessageInChat,
+        removeMessageFromChat,
+        openChatWith,
+      }}
+    >
+      {children}
+    </MessageContext.Provider>
+  );
+};
+
+export const useMessages = () => {
+  const context = useContext(MessageContext);
+  if (!context) throw new Error('useMessages must be used within MessageProvider');
+  return context;
+};

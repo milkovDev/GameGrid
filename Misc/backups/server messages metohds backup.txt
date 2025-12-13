@@ -1,0 +1,52 @@
+repo
+
+    public Collection<MessageNode> findMessagesBetween(String user1Id, String user2Id) {
+        Session session = sessionFactory.openSession();
+        String cypher = """
+    MATCH (u1:UserNode {userId: $user1Id}), (u2:UserNode {userId: $user2Id})
+    MATCH (sender)-[:SENT]->(msg:MessageNode)-[:TO]->(recipient)
+    WHERE (sender = u1 AND recipient = u2) OR (sender = u2 AND recipient = u1)
+    RETURN msg ORDER BY msg.createdAt ASC
+    """;
+        Map<String, Object> params = Map.of("user1Id", user1Id, "user2Id", user2Id);
+
+        Iterable<MessageNode> results = session.query(MessageNode.class, cypher, params);
+        Collection<MessageNode> messages = new ArrayList<>();
+
+        // Load each message with its relationships
+        for (MessageNode msg : results) {
+            MessageNode fullMessage = session.load(MessageNode.class, msg.getId(), 1);
+            messages.add(fullMessage);
+        }
+
+        session.clear();
+        return messages;
+    }
+	
+service
+
+    public List<MessageNodeDTO> getMessagesBetween(String user1Id, String user2Id) {
+        return messageNodeRepository.findMessagesBetween(user1Id, user2Id).stream()
+                .map(messageNodeMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+	
+resource
+   @GET
+    @Path("/between/{user1Id}/{user2Id}")
+    @RolesAllowed({"user", "superuser"})
+    public Response getMessagesFromTo(@PathParam("user1Id") String user1Id, @PathParam("user2Id") String user2Id) {
+        try {
+            String currentUserId = identity.getPrincipal().getName();
+            if (!(user1Id.equals(currentUserId) || user2Id.equals(currentUserId))) {
+                throw new ForbiddenException("You can only retrieve messages where you are one of the participants");
+            }
+            List<MessageNodeDTO> messages = service.getMessagesBetween(user1Id, user2Id);
+            return Response.ok(messages).build();
+        } catch (Exception e) {
+            String msg = "Unexpected error while retrieving messages: " + e.getMessage();
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(msg)
+                    .build();
+        }
+    }

@@ -1,0 +1,964 @@
+package org.acme.PGDB.Entities;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Entity
+@Table(name = "articles")
+public class Article extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "articleSeq")
+    @SequenceGenerator(name = "articleSeq", sequenceName = "article_seq", allocationSize = 1)
+    private Long id;
+
+    @Column(length = 255, nullable = false)
+    private String title;
+
+    @ManyToOne(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "author_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private User author;
+
+    @Column(nullable = false)
+    private LocalDateTime publishedAt;
+
+    @Column(length = 255, nullable = true)
+    private String featuredImageUrl;
+
+    @OneToMany(mappedBy = "article", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ArticleBlock> articleBlocks;
+
+    // Public empty constructor
+    public Article() {}
+
+    // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public User getAuthor() {
+        return author;
+    }
+
+    public void setAuthor(User author) {
+        this.author = author;
+    }
+
+    public LocalDateTime getPublishedAt() {
+        return publishedAt;
+    }
+
+    public void setPublishedAt(LocalDateTime publishedAt) {
+        this.publishedAt = publishedAt;
+    }
+
+    public String getFeaturedImageUrl() {
+        return featuredImageUrl;
+    }
+
+    public void setFeaturedImageUrl(String featuredImageUrl) {
+        this.featuredImageUrl = featuredImageUrl;
+    }
+
+    public List<ArticleBlock> getArticleBlocks() {
+        return articleBlocks;
+    }
+
+    public void setArticleBlocks(List<ArticleBlock> articleBlocks) {
+        this.articleBlocks = articleBlocks;
+    }
+
+    // toString method
+    @Override
+    public String toString() {
+        return "Article{" +
+                "id=" + id +
+                ", title='" + title + '\'' +
+                ", author=" + author +
+                ", publishedAt=" + publishedAt +
+                ", featuredImageUrl='" + featuredImageUrl + '\'' +
+                ", articleBlocks=" + articleBlocks +
+                '}';
+    }
+}
+
+package org.acme.PGDB.Entities;
+
+public enum BlockTypeEnum {
+    HEADING,
+    PARAGRAPH,
+    IMAGE
+}
+
+package org.acme.PGDB.Entities;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
+@Entity
+@Table(name = "article_blocks")
+public class ArticleBlock extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "articleBlockSeq")
+    @SequenceGenerator(name = "articleBlockSeq", sequenceName = "article_block_seq", allocationSize = 1)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "article_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Article article;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50, nullable = false)
+    private BlockTypeEnum blockType;
+
+    @Column(length = 2000, nullable = false)
+    private String content;
+
+    @Column(nullable = false)
+    private int position;
+
+    // Public empty constructor
+    public ArticleBlock() {}
+
+    // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Article getArticle() {
+        return article;
+    }
+
+    public void setArticle(Article article) {
+        this.article = article;
+    }
+
+    public BlockTypeEnum getBlockType() {
+        return blockType;
+    }
+
+    public void setBlockType(BlockTypeEnum blockType) {
+        this.blockType = blockType;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public int getPosition() {
+        return position;
+    }
+
+    public void setPosition(int position) {
+        this.position = position;
+    }
+
+    // toString method
+    @Override
+    public String toString() {
+        return "ArticleBlock{" +
+                "id=" + id +
+                ", article=" + article +
+                ", blockType=" + blockType +
+                ", content='" + content + '\'' +
+                ", position=" + position +
+                '}';
+    }
+}
+
+package org.acme.PGDB.Entities;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
+
+import java.util.List;
+
+@Entity
+@Table(name = "developers")
+public class Developer extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "developerSeq")
+    @SequenceGenerator(name = "developerSeq", sequenceName = "developer_seq", allocationSize = 1)
+    private Long id;
+
+    @Column(length = 255, nullable = false, unique = true)
+    private String name;
+
+    @OneToMany(mappedBy = "developer", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Game> games;
+
+    // Public empty constructor
+    public Developer() {}
+
+    // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public List<Game> getGames() {
+        return games;
+    }
+
+    public void setGames(List<Game> games) {
+        this.games = games;
+    }
+
+    // toString method
+    @Override
+    public String toString() {
+        return "Developer{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", games=" + games +
+                '}';
+    }
+}
+
+package org.acme.PGDB.Entities;
+
+public enum GenreEnum {
+    ACTION,
+    ADVENTURE,
+    RPG,
+    FPS,
+    STRATEGY,
+    SIMULATION,
+    SPORTS,
+    RACING,
+    HORROR,
+    PUZZLE,
+    PLATFORMER,
+    MMO,
+    MOBA,
+    FIGHTING,
+    SURVIVAL,
+    OTHER
+}
+
+package org.acme.PGDB.Entities;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
+
+import java.util.List;
+
+@Entity
+@Table(name = "platforms")
+public class Platform extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "platformSeq")
+    @SequenceGenerator(name = "platformSeq", sequenceName = "platform_seq", allocationSize = 1)
+    private Long id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50, nullable = false, unique = true)
+    private PlatformEnum name;
+
+    @OneToMany(mappedBy = "platform", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<GamesPlatforms> gamesPlatforms;
+
+    // Public empty constructor
+    public Platform() {}
+
+    // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public PlatformEnum getName() {
+        return name;
+    }
+
+    public void setName(PlatformEnum name) {
+        this.name = name;
+    }
+
+    public List<GamesPlatforms> getGamesPlatforms() {
+        return gamesPlatforms;
+    }
+
+    public void setGamesPlatforms(List<GamesPlatforms> gamesPlatforms) {
+        this.gamesPlatforms = gamesPlatforms;
+    }
+
+    // toString method
+    @Override
+    public String toString() {
+        return "Platform{" +
+                "id=" + id +
+                ", name=" + name +
+                ", gamesPlatforms=" + gamesPlatforms +
+                '}';
+    }
+}
+
+package org.acme.PGDB.Entities;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
+@Entity
+@Table(name = "games_platforms")
+public class GamesPlatforms extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "gamesPlatformsSeq")
+    @SequenceGenerator(name = "gamesPlatformsSeq", sequenceName = "games_platforms_seq", allocationSize = 1)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "game_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Game game;
+
+    @ManyToOne(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "platform_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Platform platform;
+
+    // Public empty constructor
+    public GamesPlatforms() {}
+
+    // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Game getGame() {
+        return game;
+    }
+
+    public void setGame(Game game) {
+        this.game = game;
+    }
+
+    public Platform getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(Platform platform) {
+        this.platform = platform;
+    }
+
+    // toString method
+    @Override
+    public String toString() {
+        return "GamesPlatforms{" +
+                "id=" + id +
+                ", game=" + game +
+                ", platform=" + platform +
+                '}';
+    }
+}
+
+package org.acme.PGDB.Entities;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@Entity
+@Table(name = "games")
+public class Game extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "gameSeq")
+    @SequenceGenerator(name = "gameSeq", sequenceName = "game_seq", allocationSize = 1)
+    private Long id;
+
+    @Column(length = 255, nullable = false, unique = true)
+    private String title;
+
+    @Column(length = 2000, nullable = false)
+    private String description;
+
+    @Column(nullable = false)
+    private LocalDate releaseDate;
+
+    @ManyToOne(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "developer_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Developer developer;
+
+    @ManyToOne(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "publisher_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Publisher publisher;
+
+    @Column(length = 255, nullable = false)
+    private String coverUrl;
+
+    @OneToMany(mappedBy = "game", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UserGameListEntry> userGameListEntries;
+
+    @OneToMany(mappedBy = "game", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<GamesGenres> gamesGenres;
+
+    @OneToMany(mappedBy = "game", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<GamesPlatforms> gamesPlatforms;
+
+    // Public empty constructor
+    public Game() {}
+
+    // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public LocalDate getReleaseDate() {
+        return releaseDate;
+    }
+
+    public void setReleaseDate(LocalDate releaseDate) {
+        this.releaseDate = releaseDate;
+    }
+
+    public Developer getDeveloper() {
+        return developer;
+    }
+
+    public void setDeveloper(Developer developer) {
+        this.developer = developer;
+    }
+
+    public Publisher getPublisher() {
+        return publisher;
+    }
+
+    public void setPublisher(Publisher publisher) {
+        this.publisher = publisher;
+    }
+
+    public String getCoverUrl() {
+        return coverUrl;
+    }
+
+    public void setCoverUrl(String coverUrl) {
+        this.coverUrl = coverUrl;
+    }
+
+    public List<UserGameListEntry> getUserGameListEntries() {
+        return userGameListEntries;
+    }
+
+    public void setUserGameListEntries(List<UserGameListEntry> userGameLists) {
+        this.userGameListEntries = userGameLists;
+    }
+
+    public List<GamesGenres> getGamesGenres() {
+        return gamesGenres;
+    }
+
+    public void setGamesGenres(List<GamesGenres> gamesGenres) {
+        this.gamesGenres = gamesGenres;
+    }
+
+    public List<GamesPlatforms> getGamesPlatforms() {
+        return gamesPlatforms;
+    }
+
+    public void setGamesPlatforms(List<GamesPlatforms> gamesPlatforms) {
+        this.gamesPlatforms = gamesPlatforms;
+    }
+
+    // toString method
+    @Override
+    public String toString() {
+        return "Game{" +
+                "id=" + id +
+                ", title='" + title + '\'' +
+                ", description='" + description + '\'' +
+                ", releaseDate=" + releaseDate +
+                ", developer=" + developer +
+                ", publisher=" + publisher +
+                ", coverUrl='" + coverUrl + '\'' +
+                ", userGameLists=" + userGameListEntries +
+                ", gamesGenres=" + gamesGenres +
+                ", gamesPlatforms=" + gamesPlatforms +
+                '}';
+    }
+}
+
+package org.acme.PGDB.Entities;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
+@Entity
+@Table(name = "games_genres")
+public class GamesGenres extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "gamesGenresSeq")
+    @SequenceGenerator(name = "gamesGenresSeq", sequenceName = "games_genres_seq", allocationSize = 1)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "game_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Game game;
+
+    @ManyToOne(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "genre_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Genre genre;
+
+    // Public empty constructor
+    public GamesGenres() {}
+
+    // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Game getGame() {
+        return game;
+    }
+
+    public void setGame(Game game) {
+        this.game = game;
+    }
+
+    public Genre getGenre() {
+        return genre;
+    }
+
+    public void setGenre(Genre genre) {
+        this.genre = genre;
+    }
+
+    // toString method
+    @Override
+    public String toString() {
+        return "GamesGenres{" +
+                "id=" + id +
+                ", game=" + game +
+                ", genre=" + genre +
+                '}';
+    }
+}
+
+package org.acme.PGDB.Entities;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
+
+import java.util.List;
+
+@Entity
+@Table(name = "genres")
+public class Genre extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "genreSeq")
+    @SequenceGenerator(name = "genreSeq", sequenceName = "genre_seq", allocationSize = 1)
+    private Long id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50, nullable = false, unique = true)
+    private GenreEnum name;
+
+    @OneToMany(mappedBy = "genre", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<GamesGenres> gamesGenres;
+
+    // Public empty constructor
+    public Genre() {}
+
+    // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public GenreEnum getName() {
+        return name;
+    }
+
+    public void setName(GenreEnum name) {
+        this.name = name;
+    }
+
+    public List<GamesGenres> getGamesGenres() {
+        return gamesGenres;
+    }
+
+    public void setGamesGenres(List<GamesGenres> gamesGenres) {
+        this.gamesGenres = gamesGenres;
+    }
+
+    // toString method
+    @Override
+    public String toString() {
+        return "Genre{" +
+                "id=" + id +
+                ", name=" + name +
+                ", gamesGenres=" + gamesGenres +
+                '}';
+    }
+}
+
+package org.acme.PGDB.Entities;
+
+public enum PlatformEnum {
+    PC,
+    PLAYSTATION,
+    XBOX,
+    NINTENDO_SWITCH,
+    MOBILE,
+    OTHER
+}
+
+package org.acme.PGDB.Entities;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
+
+import java.util.List;
+
+@Entity
+@Table(name = "publishers")
+public class Publisher extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "publisherSeq")
+    @SequenceGenerator(name = "publisherSeq", sequenceName = "publisher_seq", allocationSize = 1)
+    private Long id;
+
+    @Column(length = 255, nullable = false, unique = true)
+    private String name;
+
+    @OneToMany(mappedBy = "publisher", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Game> games;
+
+    // Public empty constructor
+    public Publisher() {}
+
+    // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public List<Game> getGames() {
+        return games;
+    }
+
+    public void setGames(List<Game> games) {
+        this.games = games;
+    }
+
+    // toString method
+    @Override
+    public String toString() {
+        return "Publisher{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", games=" + games +
+                '}';
+    }
+}
+
+package org.acme.PGDB.Entities;
+
+public enum StatusEnum {
+    FINISHED,
+    PLAYING,
+    WISHLIST
+}
+
+package org.acme.PGDB.Entities;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
+
+import java.util.List;
+import java.util.UUID;
+
+@Entity
+@Table(name = "users")
+public class User extends PanacheEntityBase {
+    @Id
+    private UUID id;
+
+    @Column(length = 50, nullable = false)
+    private String displayName;
+
+    @Column(length = 2000, nullable = true)
+    private String bio;
+
+    @Column(length = 255, nullable = true)
+    private String avatarUrl;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UserGameListEntry> userGameListEntries;
+
+    @OneToMany(mappedBy = "author", fetch = FetchType.EAGER, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Article> articles;
+
+    // Public empty constructor
+    public User() {}
+
+    // Getters and setters
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String username) {
+        this.displayName = username;
+    }
+
+    public String getBio() {
+        return bio;
+    }
+
+    public void setBio(String bio) {
+        this.bio = bio;
+    }
+
+    public String getAvatarUrl() {
+        return avatarUrl;
+    }
+
+    public void setAvatarUrl(String avatarUrl) {
+        this.avatarUrl = avatarUrl;
+    }
+
+    public List<UserGameListEntry> getUserGameListEntries() {
+        return userGameListEntries;
+    }
+
+    public void setUserGameListEntries(List<UserGameListEntry> userGameLists) {
+        this.userGameListEntries = userGameLists;
+    }
+
+    public List<Article> getArticles() {
+        return articles;
+    }
+
+    public void setArticles(List<Article> articles) {
+        this.articles = articles;
+    }
+
+    // toString method
+    @Override
+    public String toString() {
+        return "User{" +
+                "id=" + id +
+                ", username='" + displayName + '\'' +
+                ", bio='" + bio + '\'' +
+                ", avatarUrl='" + avatarUrl + '\'' +
+                ", userGameLists=" + userGameListEntries +
+                ", articles=" + articles +
+                '}';
+    }
+}
+
+package org.acme.PGDB.Entities;
+
+import io.quarkus.hibernate.orm.panache.PanacheEntityBase;
+import jakarta.persistence.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
+
+@Entity
+@Table(name = "user_game_list_entries")
+public class UserGameListEntry extends PanacheEntityBase {
+    @Id
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "userGameListSeq")
+    @SequenceGenerator(name = "userGameListSeq", sequenceName = "user_game_list_seq", allocationSize = 1)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "user_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private User user;
+
+    @ManyToOne(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "game_id", nullable = false)
+    @OnDelete(action = OnDeleteAction.CASCADE)
+    private Game game;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 50, nullable = false)
+    private StatusEnum status;
+
+    @Column(nullable = false)
+    private boolean isFavorite = false;
+
+    @Column(nullable = true)
+    private Integer rating;
+
+    @Column(length = 2000, nullable = true)
+    private String reviewText;
+
+    // Public empty constructor
+    public UserGameListEntry() {}
+
+    // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public User getUser() {
+        return user;
+    }
+
+    public void setUser(User user) {
+        this.user = user;
+    }
+
+    public Game getGame() {
+        return game;
+    }
+
+    public void setGame(Game game) {
+        this.game = game;
+    }
+
+    public StatusEnum getStatus() {
+        return status;
+    }
+
+    public void setStatus(StatusEnum status) {
+        this.status = status;
+    }
+
+    public boolean getIsFavorite() {
+        return isFavorite;
+    }
+
+    public void setIsFavorite(boolean isFavorite) {
+        this.isFavorite = isFavorite;
+    }
+
+    public Integer getRating() {
+        return rating;
+    }
+
+    public void setRating(Integer rating) {
+        this.rating = rating;
+    }
+
+    public String getReviewText() {
+        return reviewText;
+    }
+
+    public void setReviewText(String reviewText) {
+        this.reviewText = reviewText;
+    }
+
+    // toString method
+    @Override
+    public String toString() {
+        return "UserGameList{" +
+                "id=" + id +
+                ", user=" + user +
+                ", game=" + game +
+                ", status=" + status +
+                ", isFavorite=" + isFavorite +
+                ", rating=" + rating +
+                ", reviewText='" + reviewText + '\'' +
+                '}';
+    }
+}
