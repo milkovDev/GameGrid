@@ -44,7 +44,6 @@ A web platform for discovering video games, reading industry news, and connectin
 | Graph Database | Neo4j (containerized) — handles social features |
 | Auth | Keycloak (containerized) + JWT |
 | Real-time | Quarkus WebSockets + React WebSocket Client |
-| Public Tunnel | Ngrok |
 
 ---
 
@@ -75,9 +74,4 @@ cd backend
 cd frontend
 npm install
 npm start
-```
-
-**5. (Optional) Expose publicly with Ngrok**
-```bash
-ngrok http 3000
 ```
