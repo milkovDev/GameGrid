@@ -4,7 +4,7 @@ A web platform for discovering video games, reading industry news, and connectin
 
 ---
 
-## Screenshots (in bulgarian)
+## Screenshots
 
 *Home Page*
 <img width="1005" height="498" alt="image" src="https://github.com/user-attachments/assets/f1eb971f-feca-46ae-b976-903cb8dc0f7f" />
